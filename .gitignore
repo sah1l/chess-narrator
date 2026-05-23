@@ -15,24 +15,27 @@ yarn-error.log*
 logs/
 
 # Pipeline output: keep curated sample MP4, ignore the rest
-samples/output/*
-!samples/output/.gitkeep
-!samples/output/sample.mp4
+**/samples/output/*
+!**/samples/output/.gitkeep
+!**/samples/output/sample.mp4
 
 # Analysis cache (regenerated from PGN)
-samples/output/.cache/
+**/samples/output/.cache/
 
-# Per-shot intermediates (audio/render frames live under samples/output/, but list explicitly in case anyone reroutes them)
-samples/output/audio/
-samples/output/render/
+# Per-shot intermediates
+**/samples/output/audio/
+**/samples/output/render/
 
 # Edge-tts intermediate files
 *.tmp.mp3
 *.tmp.wav
 
 # Test scratch dirs
-test/_*_tmp/
-test/.tmp/
+**/test/_*_tmp/
+**/test/.tmp/
+
+# Agent skill install scratch (created by gh skill install)
+.agents/
 
 # Editor / IDE
 .vscode/

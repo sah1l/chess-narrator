@@ -10,9 +10,9 @@ Designed for intermediate club players who want to understand *why* a game went 
 
 Morphy's Opera Game (Paris, 1858) — the canonical attacking miniature, used as the bundled walkthrough sample.
 
-<video src="https://github.com/sah1l/chess-narrator/raw/main/samples/output/sample.mp4" controls width="720"></video>
+<video src="https://github.com/sah1l/chess-narrator/raw/main/skills/chess-narrator/samples/output/sample.mp4" controls width="720"></video>
 
-> If the inline player doesn't load in your markdown viewer, watch / download directly: **[samples/output/sample.mp4](samples/output/sample.mp4)** ([raw link](https://github.com/sah1l/chess-narrator/raw/main/samples/output/sample.mp4)).
+> If the inline player doesn't load in your markdown viewer, watch / download directly: **[skills/chess-narrator/samples/output/sample.mp4](skills/chess-narrator/samples/output/sample.mp4)** ([raw link](https://github.com/sah1l/chess-narrator/raw/main/skills/chess-narrator/samples/output/sample.mp4)).
 
 ## What it produces
 
@@ -28,16 +28,9 @@ A 1920×1080 MP4, typically 5–7 minutes, that:
 
 This repo is a Claude Code skill. Install it with the GitHub CLI's skill subcommand (currently in preview), then run `npm install` + `verify` to set up the Node side.
 
-**User-scoped (available in every project):**
+The skill lives at [`skills/chess-narrator/`](skills/chess-narrator) in this repo. `gh skill install` reads that path and drops it into your agent's skills directory.
 
-```bash
-gh skill install sah1l/chess-narrator chess-narrator --agent claude-code --scope user
-# gh prints the install path — cd into it, then:
-npm install
-node src/cli.js verify
-```
-
-**Project-scoped (only inside this repo):** drop `--scope user` and run from the repo root. The skill lands in `.agents/skills/chess-narrator/`.
+**Project-scoped (only inside the current repo, default):**
 
 ```bash
 gh skill install sah1l/chess-narrator chess-narrator --agent claude-code
@@ -46,10 +39,19 @@ npm install
 node src/cli.js verify
 ```
 
+**User-scoped (available in every project on your machine):**
+
+```bash
+gh skill install sah1l/chess-narrator chess-narrator --agent claude-code --scope user
+# gh prints the install path — cd into it, then:
+npm install
+node src/cli.js verify
+```
+
 **Pin to a version / commit** (avoid surprise updates):
 
 ```bash
-gh skill install sah1l/chess-narrator chess-narrator --agent claude-code --scope user --pin <tag-or-sha>
+gh skill install sah1l/chess-narrator chess-narrator --agent claude-code --pin <tag-or-sha>
 ```
 
 **Update later:**
@@ -60,27 +62,23 @@ gh skill update chess-narrator
 gh skill update --all
 ```
 
-> `gh skill` requires a reasonably recent `gh` (preview feature). If your `gh` doesn't have it yet, fall back to the clone recipe below.
+> `gh skill` is in preview and ships in recent `gh` builds. If your `gh` doesn't have it yet, use the clone fallback below.
 
 <details>
-<summary>Fallback: plain <code>git clone</code></summary>
+<summary>Fallback: plain <code>git clone</code> (no <code>gh skill</code>)</summary>
+
+Clone the whole repo and work directly inside the skill directory:
 
 ```bash
-# macOS / Linux
-git clone https://github.com/sah1l/chess-narrator ~/.agents/skills/chess-narrator
-cd ~/.agents/skills/chess-narrator
+git clone https://github.com/sah1l/chess-narrator
+cd chess-narrator/skills/chess-narrator
 npm install && node src/cli.js verify
 ```
 
-```powershell
-# Windows
-git clone https://github.com/sah1l/chess-narrator "$env:USERPROFILE\.agents\skills\chess-narrator"
-cd "$env:USERPROFILE\.agents\skills\chess-narrator"
-npm install ; node src/cli.js verify
-```
+To wire it up as a Claude Code skill without `gh`, copy or symlink the `skills/chess-narrator/` directory into `.agents/skills/chess-narrator/` (project scope) or your user-scoped agent skills dir.
 </details>
 
-Once installed, just say things like *"make a video of this Lichess game: https://lichess.org/abc123"* or *"explain this PGN as a walkthrough"* and Claude will run the pipeline. See [SKILL.md](SKILL.md) for the full trigger surface.
+Once installed, just say things like *"make a video of this Lichess game: https://lichess.org/abc123"* or *"explain this PGN as a walkthrough"* and Claude will run the pipeline. See [`skills/chess-narrator/SKILL.md`](skills/chess-narrator/SKILL.md) for the full trigger surface.
 
 ## Verify your setup
 
@@ -117,7 +115,7 @@ Required: Node 22+, ffmpeg on PATH, Chrome / Chromium / Edge. The npm deps insta
 ```bash
 # 1. Clone + install (skip if already installed as a skill above)
 git clone https://github.com/sah1l/chess-narrator
-cd chess-narrator
+cd chess-narrator/skills/chess-narrator
 npm install
 node src/cli.js verify
 
