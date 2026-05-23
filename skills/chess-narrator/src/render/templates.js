@@ -1,4 +1,5 @@
 import { renderBoardSvg } from "./board.js";
+import { renderEvalBar, EVAL_BAR_CSS } from "./evalbar.js";
 
 /**
  * Shot HTML templates. Each shot renders as a 1920x1080 frame designed to
@@ -15,6 +16,21 @@ import { renderBoardSvg } from "./board.js";
 export const FRAME_WIDTH = 1920;
 export const FRAME_HEIGHT = 1080;
 const BOARD_SIZE = 880;
+const EVAL_BAR_WIDTH = 48;
+const EVAL_BAR_GAP = 20;
+
+/**
+ * Render the left-side board pane: eval bar + chessboard SVG.
+ * Shots that omit `shot.eval` get a neutral (50/50) bar; title shots don't
+ * call this at all.
+ */
+function renderBoardPane(boardOpts, shot) {
+  const ev = shot?.eval ?? { cp: null, mate: null };
+  return `<div class="board-pane">
+    ${renderEvalBar({ cp: ev.cp, mate: ev.mate, height: BOARD_SIZE, width: EVAL_BAR_WIDTH })}
+    <div class="board-wrap">${renderBoardSvg(boardOpts)}</div>
+  </div>`;
+}
 
 export function renderShotPage(shot, ctx = {}) {
   const body = renderShotBody(shot, ctx);
@@ -72,7 +88,7 @@ function renderTitle(shot) {
 function renderIntro(shot, ctx) {
   return `
 <section class="shot shot-split" data-shot-id="${escapeHtml(shot.id)}">
-  <div class="board-pane">${renderBoardSvg({ fen: shot.fen, size: BOARD_SIZE })}</div>
+  ${renderBoardPane({ fen: shot.fen, size: BOARD_SIZE }, shot)}
   <div class="info-pane">
     <p class="info-eyebrow">${escapeHtml(ctx.title ?? "")}</p>
     <p class="info-narration">${escapeHtml(shot.narration ?? "")}</p>
@@ -91,14 +107,12 @@ function renderMove(shot, ctx) {
     : "";
   return `
 <section class="shot shot-split shot-move" data-shot-id="${escapeHtml(shot.id)}">
-  <div class="board-pane">
-    ${renderBoardSvg({
-      fen: shot.fenBefore,
-      size: BOARD_SIZE,
-      arrows: shot.arrows ?? [],
-      highlights: shot.highlights ?? [],
-    })}
-  </div>
+  ${renderBoardPane({
+    fen: shot.fenBefore,
+    size: BOARD_SIZE,
+    arrows: shot.arrows ?? [],
+    highlights: shot.highlights ?? [],
+  }, shot)}
   <div class="info-pane">
     <p class="info-eyebrow">${escapeHtml(ctx.title ?? "")}</p>
     <div class="info-headline">
@@ -125,14 +139,12 @@ function renderMoment(shot, ctx) {
       : "";
   return `
 <section class="shot shot-split shot-moment" data-shot-id="${escapeHtml(shot.id)}">
-  <div class="board-pane">
-    ${renderBoardSvg({
-      fen: shot.fenBefore,
-      size: BOARD_SIZE,
-      arrows: shot.arrows ?? [],
-      highlights: shot.highlights ?? [],
-    })}
-  </div>
+  ${renderBoardPane({
+    fen: shot.fenBefore,
+    size: BOARD_SIZE,
+    arrows: shot.arrows ?? [],
+    highlights: shot.highlights ?? [],
+  }, shot)}
   <div class="info-pane">
     <p class="info-eyebrow">${escapeHtml(ctx.title ?? "")}</p>
     <div class="info-headline">
@@ -152,14 +164,12 @@ function renderMoment(shot, ctx) {
 function renderChallengePrompt(shot, ctx) {
   return `
 <section class="shot shot-split shot-challenge shot-challenge-prompt" data-shot-id="${escapeHtml(shot.id)}">
-  <div class="board-pane">
-    ${renderBoardSvg({
-      fen: shot.fenBefore,
-      size: BOARD_SIZE,
-      arrows: shot.arrows ?? [],
-      highlights: shot.highlights ?? [],
-    })}
-  </div>
+  ${renderBoardPane({
+    fen: shot.fenBefore,
+    size: BOARD_SIZE,
+    arrows: shot.arrows ?? [],
+    highlights: shot.highlights ?? [],
+  }, shot)}
   <div class="info-pane">
     <p class="info-eyebrow">${escapeHtml(ctx.title ?? "")} — Challenge</p>
     <div class="challenge-headline">
@@ -179,14 +189,12 @@ function renderChallengePrompt(shot, ctx) {
 function renderChallengeThink(shot, ctx) {
   return `
 <section class="shot shot-split shot-challenge shot-challenge-think" data-shot-id="${escapeHtml(shot.id)}">
-  <div class="board-pane">
-    ${renderBoardSvg({
-      fen: shot.fenBefore,
-      size: BOARD_SIZE,
-      arrows: [],
-      highlights: [],
-    })}
-  </div>
+  ${renderBoardPane({
+    fen: shot.fenBefore,
+    size: BOARD_SIZE,
+    arrows: [],
+    highlights: [],
+  }, shot)}
   <div class="info-pane">
     <p class="info-eyebrow">${escapeHtml(ctx.title ?? "")} — Challenge</p>
     <div class="challenge-think-stack">
@@ -206,14 +214,12 @@ function renderChallengeCandidate(shot, ctx) {
   const idx = (shot.candidateIndex ?? 0) + 1;
   return `
 <section class="shot shot-split shot-challenge shot-challenge-candidate" data-shot-id="${escapeHtml(shot.id)}">
-  <div class="board-pane">
-    ${renderBoardSvg({
-      fen: shot.fenBefore,
-      size: BOARD_SIZE,
-      arrows: shot.arrows ?? [],
-      highlights: shot.highlights ?? [],
-    })}
-  </div>
+  ${renderBoardPane({
+    fen: shot.fenBefore,
+    size: BOARD_SIZE,
+    arrows: shot.arrows ?? [],
+    highlights: shot.highlights ?? [],
+  }, shot)}
   <div class="info-pane">
     <p class="info-eyebrow">${escapeHtml(ctx.title ?? "")} — Challenge</p>
     <div class="info-headline">
@@ -231,14 +237,12 @@ function renderChallengeCandidate(shot, ctx) {
 function renderChallengeReveal(shot, ctx) {
   return `
 <section class="shot shot-split shot-challenge shot-challenge-reveal" data-shot-id="${escapeHtml(shot.id)}">
-  <div class="board-pane">
-    ${renderBoardSvg({
-      fen: shot.fenBefore,
-      size: BOARD_SIZE,
-      arrows: shot.arrows ?? [],
-      highlights: shot.highlights ?? [],
-    })}
-  </div>
+  ${renderBoardPane({
+    fen: shot.fenBefore,
+    size: BOARD_SIZE,
+    arrows: shot.arrows ?? [],
+    highlights: shot.highlights ?? [],
+  }, shot)}
   <div class="info-pane">
     <p class="info-eyebrow">${escapeHtml(ctx.title ?? "")} — Challenge</p>
     <div class="info-headline">
@@ -254,7 +258,7 @@ function renderOutro(shot, ctx) {
   const result = shot.result ? `<p class="info-result">Result: <strong>${escapeHtml(shot.result)}</strong></p>` : "";
   return `
 <section class="shot shot-split" data-shot-id="${escapeHtml(shot.id)}">
-  <div class="board-pane">${renderBoardSvg({ fen: shot.fen, size: BOARD_SIZE })}</div>
+  ${renderBoardPane({ fen: shot.fen, size: BOARD_SIZE }, shot)}
   <div class="info-pane">
     <p class="info-eyebrow">${escapeHtml(ctx.title ?? "")}</p>
     ${result}
@@ -355,8 +359,16 @@ export const SHARED_CSS = `
   /* Split shots (intro / move / moment / outro) -------------------------- */
   .shot-split { padding: 80px; gap: 80px; }
   .board-pane {
-    flex: 0 0 ${BOARD_SIZE}px;
+    flex: 0 0 ${BOARD_SIZE + EVAL_BAR_WIDTH + EVAL_BAR_GAP}px;
     align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: ${EVAL_BAR_GAP}px;
+  }
+  .board-wrap {
+    width: ${BOARD_SIZE}px;
+    height: ${BOARD_SIZE}px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -367,6 +379,7 @@ export const SHARED_CSS = `
     border-radius: 8px;
     box-shadow: 0 24px 56px rgba(0,0,0,0.45);
   }
+  ${EVAL_BAR_CSS}
   .info-pane {
     flex: 1 1 auto;
     align-self: center;

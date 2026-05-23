@@ -98,6 +98,9 @@ function positionAnnotation({ fen, info, evaluation, depth, multiPV }) {
         playedMove: null,
         engineBest,
         evalSwing: null,
+        eval: evaluation
+          ? { cp: evaluation.cp ?? null, mate: evaluation.mate ?? null }
+          : null,
       },
     ],
   };

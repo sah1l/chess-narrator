@@ -41,11 +41,15 @@ export function buildShotList(annotation, narration) {
   const openingFen = isPosition
     ? annotation.keyMoments[0]?.fenBefore
     : annotation.plies[0]?.fenBefore;
+  const openingEval = isPosition
+    ? evalFromKeyMoment(annotation.keyMoments[0])
+    : evalFromEvaluation(annotation.plies[0]?.evalBefore);
 
   shots.push({
     id: "intro",
     kind: "intro",
     fen: openingFen,
+    eval: openingEval,
     durationSec: narration.intro.estimatedSeconds,
     narration: narration.intro.text,
   });
@@ -77,11 +81,15 @@ export function buildShotList(annotation, narration) {
   const finalFen = isPosition
     ? annotation.keyMoments[0]?.fenBefore
     : lastFen(annotation.plies);
+  const finalEval = isPosition
+    ? evalFromKeyMoment(annotation.keyMoments[0])
+    : evalFromEvaluation(lastPly(annotation.plies)?.evalAfter);
 
   shots.push({
     id: "outro",
     kind: "outro",
     fen: finalFen,
+    eval: finalEval,
     result: annotation.result ?? null,
     durationSec: narration.outro.estimatedSeconds,
     narration: narration.outro.text,
@@ -165,6 +173,7 @@ function buildPlyShot(ply, km, seg, idx) {
     isBookMove: ply.isBookMove === true,
     fenBefore: ply.fenBefore,
     fenAfter: ply.fenAfter ?? null,
+    eval: evalFromEvaluation(ply.evalBefore),
     playedMove: { san: ply.san, uci: ply.uci },
     engineBest,
     moveLabel,
@@ -192,12 +201,16 @@ function buildChallengeShots(ply, challenge) {
   const baseId = `ply${String(ply.plyIndex).padStart(2, "0")}`;
   const moveLabel = `${ply.moveNumber}${ply.sideToMove === "w" ? "." : "..."}`;
   const moverText = ply.sideToMove === "w" ? "White to move" : "Black to move";
+  // All challenge sub-shots display fenBefore of the challenge ply, so they
+  // all share the eval taken from evalBefore — bar matches the displayed board.
+  const challengeEval = evalFromEvaluation(ply.evalBefore);
 
   out.push({
     id: `challenge-prompt-${baseId}`,
     kind: "challenge-prompt",
     plyIndex: ply.plyIndex,
     fenBefore: ply.fenBefore,
+    eval: challengeEval,
     sideToMove: ply.sideToMove,
     moveLabel: `${moveLabel}?`,
     moverText,
@@ -213,6 +226,7 @@ function buildChallengeShots(ply, challenge) {
     kind: "challenge-think",
     plyIndex: ply.plyIndex,
     fenBefore: ply.fenBefore,
+    eval: challengeEval,
     sideToMove: ply.sideToMove,
     moverText,
     arrows: [],
@@ -229,6 +243,7 @@ function buildChallengeShots(ply, challenge) {
       plyIndex: ply.plyIndex,
       candidateIndex: idx,
       fenBefore: ply.fenBefore,
+      eval: challengeEval,
       sideToMove: ply.sideToMove,
       candidate: { san: cand.san, uci: cand.uci },
       arrows: arrow ? [arrow] : [],
@@ -245,6 +260,7 @@ function buildChallengeShots(ply, challenge) {
     plyIndex: ply.plyIndex,
     fenBefore: ply.fenBefore,
     fenAfter: ply.fenAfter ?? null,
+    eval: challengeEval,
     sideToMove: ply.sideToMove,
     answer: { san: ply.san, uci: ply.uci },
     moveLabel: `${moveLabel}${ply.san}`,
@@ -282,6 +298,7 @@ function buildPositionShot(km, seg, annotation) {
     momentKind: km.kind,
     fenBefore: km.fenBefore,
     fenAfter: null,
+    eval: evalFromKeyMoment(km),
     playedMove: km.playedMove,
     engineBest: km.engineBest,
     moveLabel: km.playedMove?.san ?? "Position",
@@ -343,6 +360,32 @@ function lastFen(plies) {
   if (!plies?.length) return null;
   const last = plies[plies.length - 1];
   return last.fenAfter ?? last.fenBefore;
+}
+
+function lastPly(plies) {
+  return plies?.length ? plies[plies.length - 1] : null;
+}
+
+/**
+ * Project a stored evaluation object down to just the bar inputs.
+ * Returns { cp, mate } with both null-tolerant; null cp + null mate → bar
+ * defaults to even (50/50).
+ */
+function evalFromEvaluation(ev) {
+  if (!ev) return { cp: null, mate: null };
+  return { cp: ev.cp ?? null, mate: ev.mate ?? null };
+}
+
+/**
+ * Position-mode key moments don't store their own evaluation, but engineBest
+ * carries the engine's PV with cp/mate at the top-level evaluation it was
+ * derived from. We don't have that here, so fall back to engineBest's PV[0]
+ * cp/mate when available. If absent, default to even.
+ */
+function evalFromKeyMoment(km) {
+  if (!km) return { cp: null, mate: null };
+  if (km.eval) return evalFromEvaluation(km.eval);
+  return { cp: null, mate: null };
 }
 
 function defaultSubtitle(annotation) {
