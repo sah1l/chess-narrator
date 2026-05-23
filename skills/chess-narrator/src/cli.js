@@ -48,6 +48,8 @@ Options (analyze):
   --out <path>            Where to write annotation.json (default: samples/output/annotation.json)
   --cache-dir <path>      Cache directory (default: samples/output/.cache)
   --no-cache              Bypass the cache
+  --no-challenge          Skip the "pause and think" challenge ply (annotation.challenge = null).
+                          Use when you want a straight walkthrough with no puzzle interruption.
 
 Options (narrate-prompt):
   --out <path>            Write prompt to file instead of stdout
@@ -139,6 +141,7 @@ async function cmdAnalyze(args) {
       out: { type: "string" },
       "cache-dir": { type: "string" },
       "no-cache": { type: "boolean" },
+      "no-challenge": { type: "boolean" },
       help: { type: "boolean" },
     },
   });
@@ -179,7 +182,14 @@ async function cmdAnalyze(args) {
     };
     const res = await analyzeGameCached(
       parsed,
-      { sweepDepth, keyMomentDepth, multiPV, openingPlies, onProgress },
+      {
+        sweepDepth,
+        keyMomentDepth,
+        multiPV,
+        openingPlies,
+        onProgress,
+        noChallenge: values["no-challenge"],
+      },
       values["no-cache"] ? path.join(cacheDir, "__nocache__") : cacheDir
     );
     annotation = res.annotation;

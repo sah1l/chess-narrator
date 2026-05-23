@@ -199,20 +199,32 @@ function terminalStateOf(fenAfter) {
 
 /**
  * Cache wrapper: hash inputs, write/read annotation.json from disk.
+ *
+ * `noChallenge` is applied AFTER the cache lookup — it just nulls the
+ * already-computed challenge field. That way enabling/disabling the challenge
+ * never invalidates the (expensive) Stockfish work.
  */
 export async function analyzeGameCached(parsed, opts, cacheDir) {
   const key = cacheKey(parsed, opts);
   const file = path.join(cacheDir, `${key}.json`);
+  let annotation;
+  let fromCache = false;
   try {
     const cached = JSON.parse(await readFile(file, "utf8"));
-    if (cached.schemaVersion === SCHEMA_VERSION) return { annotation: cached, fromCache: true };
+    if (cached.schemaVersion === SCHEMA_VERSION) {
+      annotation = cached;
+      fromCache = true;
+    }
   } catch {
     // miss
   }
-  const annotation = await analyzeGame(parsed, opts);
-  await mkdir(cacheDir, { recursive: true });
-  await writeFile(file, JSON.stringify(annotation, null, 2));
-  return { annotation, fromCache: false };
+  if (!annotation) {
+    annotation = await analyzeGame(parsed, opts);
+    await mkdir(cacheDir, { recursive: true });
+    await writeFile(file, JSON.stringify(annotation, null, 2));
+  }
+  if (opts.noChallenge) annotation.challenge = null;
+  return { annotation, fromCache };
 }
 
 function cacheKey(parsed, opts) {
