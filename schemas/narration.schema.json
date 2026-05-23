@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/sahil/chess-game-explainer/schemas/narration.schema.json",
+  "title": "Chess Game Narration",
+  "description": "Narration script for a chess explainer video. Produced by Claude from an annotation JSON; consumed by the script builder to produce the final shot list. One segment per ply gives a full guided walkthrough of the game. Optionally includes a 'challenge' block for a pause-and-think puzzle at one critical position.",
+  "type": "object",
+  "required": ["schemaVersion", "title", "intro", "segments", "outro"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.2.0" },
+    "title": {
+      "type": "string",
+      "description": "Short title for the video, used on the title card and as the file name.",
+      "minLength": 4,
+      "maxLength": 80
+    },
+    "subtitle": {
+      "type": ["string", "null"],
+      "description": "Optional one-line subtitle for the title card (e.g., players, year, event).",
+      "maxLength": 120
+    },
+    "intro": {
+      "type": "object",
+      "required": ["text", "estimatedSeconds"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "estimatedSeconds": { "type": "number", "minimum": 2, "maximum": 30 }
+      }
+    },
+    "segments": {
+      "type": "array",
+      "description": "One segment per ply, in chronological order. Each segment narrates the move at that ply. For the challenge-ply (if any), this segment's text may be empty or vestigial — the challenge block supplies its visible narration instead.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["plyIndex", "text", "estimatedSeconds"],
+        "additionalProperties": false,
+        "properties": {
+          "plyIndex": {
+            "type": "integer",
+            "description": "Index of the ply from the annotation this segment narrates. Use -1 for position-mode segments.",
+            "minimum": -1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Narration to be read aloud over this segment. Should align with estimatedSeconds at a natural reading pace (~150 wpm)."
+          },
+          "estimatedSeconds": {
+            "type": "number",
+            "minimum": 1.5,
+            "maximum": 45,
+            "description": "Approximate spoken duration. Book/routine moves: 3-6s. Interesting moves: 6-10s. Critical moments: 10-18s."
+          },
+          "depth": {
+            "type": "string",
+            "enum": ["brief", "standard", "deep"],
+            "description": "Optional commentary depth hint. 'brief' for book/forced moves, 'standard' for routine, 'deep' for inaccuracies+ and brilliancies. Used by the renderer to choose layout density.",
+            "default": "standard"
+          },
+          "highlightSquares": {
+            "type": "array",
+            "description": "Optional squares to highlight on the board during this segment (e.g., ['e4', 'd5']).",
+            "items": { "type": "string", "pattern": "^[a-h][1-8]$" }
+          },
+          "showEngineLine": {
+            "type": "boolean",
+            "description": "If true, the renderer should animate through the engineBest.pv for this ply after the played move.",
+            "default": false
+          }
+        }
+      }
+    },
+    "challenge": {
+      "type": ["object", "null"],
+      "description": "Optional pause-and-think puzzle inserted in place of the normal shot at challenge.plyIndex. Composed of: a prompt asking the viewer to find the move, a silent thinking pause, 2-3 'why not X?' explanations of the wrong candidates, then a reveal of the right move. Use this only when annotation.challenge is non-null. The plyIndex must equal annotation.challenge.plyIndex.",
+      "required": ["plyIndex", "prompt", "candidates", "reveal"],
+      "additionalProperties": false,
+      "properties": {
+        "plyIndex": {
+          "type": "integer",
+          "description": "Must match annotation.challenge.plyIndex.",
+          "minimum": 0
+        },
+        "prompt": {
+          "type": "object",
+          "required": ["text", "estimatedSeconds"],
+          "additionalProperties": false,
+          "description": "Sets the puzzle: 'Pause the video. White to move. What would you play here?' plus a hint at the kind of move to look for.",
+          "properties": {
+            "text": { "type": "string", "minLength": 1 },
+            "estimatedSeconds": { "type": "number", "minimum": 4, "maximum": 20 }
+          }
+        },
+        "thinkSeconds": {
+          "type": "number",
+          "minimum": 2,
+          "maximum": 15,
+          "description": "Silent thinking pause after the prompt. Board stays on screen with no narration. Default 6.",
+          "default": 6
+        },
+        "candidates": {
+          "type": "array",
+          "description": "Plausible-looking alternative moves with an explanation of why each one falls short. 1-3 entries. Each renders as one shot showing the candidate's arrow + the explanation narration.",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["san", "uci", "text", "estimatedSeconds"],
+            "additionalProperties": false,
+            "properties": {
+              "san": { "type": "string", "minLength": 1, "description": "SAN of the candidate move, e.g. 'Rxd7+'." },
+              "uci": { "type": "string", "pattern": "^[a-h][1-8][a-h][1-8][qrbnQRBN]?$", "description": "UCI of the candidate's first move, used to draw the arrow." },
+              "text": { "type": "string", "minLength": 1, "description": "Why this candidate doesn't quite work — 1-2 sentences." },
+              "estimatedSeconds": { "type": "number", "minimum": 4, "maximum": 18 }
+            }
+          }
+        },
+        "reveal": {
+          "type": "object",
+          "required": ["text", "estimatedSeconds"],
+          "additionalProperties": false,
+          "description": "The reveal of the right move. Shows the answer move's arrow in green. 2-4 sentences explaining what makes this move work.",
+          "properties": {
+            "text": { "type": "string", "minLength": 1 },
+            "estimatedSeconds": { "type": "number", "minimum": 6, "maximum": 25 }
+          }
+        }
+      }
+    },
+    "outro": {
+      "type": "object",
+      "required": ["text", "estimatedSeconds"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "estimatedSeconds": { "type": "number", "minimum": 2, "maximum": 30 }
+      }
+    }
+  }
+}

@@ -1,0 +1,250 @@
+{
+  "schemaVersion": "1.2.0",
+  "title": "The Opera Game",
+  "subtitle": "Paul Morphy vs Duke Karl / Count Isouard — Paris, 1858",
+  "intro": {
+    "text": "Paris, eighteen fifty-eight. Paul Morphy is at the opera — supposedly there for the music. He's also playing chess against two amateurs who are sharing the black pieces. What follows is one of the most famous attacking games ever recorded. Watch the way Morphy turns every single piece into part of the attack, and notice the small Black mistakes that make it possible.",
+    "estimatedSeconds": 16
+  },
+  "segments": [
+    {
+      "plyIndex": 0,
+      "text": "A king-pawn opening, claiming the centre.",
+      "estimatedSeconds": 3.5,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 1,
+      "text": "Black mirrors. The classical reply.",
+      "estimatedSeconds": 3,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 2,
+      "text": "Morphy develops the knight and attacks the e5 pawn.",
+      "estimatedSeconds": 4,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 3,
+      "text": "The Philidor Defence. Black supports the e5 pawn with d6 rather than developing a piece. It's solid, but it leaves the kingside cramped — and that cramp will matter later.",
+      "estimatedSeconds": 9,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 4,
+      "text": "Morphy strikes in the centre, fighting to open lines.",
+      "estimatedSeconds": 4,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 5,
+      "text": "A pin on the f3 knight. Modern theory prefers developing the knight first with Nf6, keeping the bishop home until the position clarifies. The pin looks active, but Black's bishop isn't really defending anything important.",
+      "estimatedSeconds": 9,
+      "depth": "standard",
+      "highlightSquares": ["g4", "f3"]
+    },
+    {
+      "plyIndex": 6,
+      "text": "Morphy takes, asking the bishop a question.",
+      "estimatedSeconds": 4,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 7,
+      "text": "Black has to take. Otherwise the e5 pawn is just lost.",
+      "estimatedSeconds": 5,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 8,
+      "text": "Recapturing with the queen, which now eyes both f7 and b7 from a distance.",
+      "estimatedSeconds": 6,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 9,
+      "text": "Black restores material equality. The position looks calm. It isn't.",
+      "estimatedSeconds": 5,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 10,
+      "text": "Pointing the bishop at f7. The engine's slight preference here is the immediate Qb3, doubling up on b7 in one move — but Bc4 is the natural human choice and it's perfectly fine. We won't go down that line.",
+      "estimatedSeconds": 10,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 11,
+      "text": "And here is the first real mistake. Nf6 develops naturally, but it blocks the queen from defending b7. Stockfish wanted Qf6 instead — same square, but the queen defends both b7 and f7 at once. After Nf6, White has a clear initiative and a target on the queenside. Watch what Morphy does with it.",
+      "estimatedSeconds": 14,
+      "depth": "deep",
+      "highlightSquares": ["f6", "b7"]
+    },
+    {
+      "plyIndex": 12,
+      "text": "There it is. The queen swings to b3 and now hits b7 and f7 at the same time. Black has to defend, and defending costs tempo.",
+      "estimatedSeconds": 8,
+      "depth": "standard",
+      "highlightSquares": ["b3", "b7", "f7"]
+    },
+    {
+      "plyIndex": 13,
+      "text": "Defending f7 with the queen. The engine slightly preferred developing the bishop to c5, but Qe7 is reasonable. The cost: the queen is now passive, and the king's bishop is stuck at home.",
+      "estimatedSeconds": 9,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 14,
+      "text": "Morphy develops calmly. The engine actually liked grabbing the b7 pawn right away — but Nc3 brings the last minor piece into play and keeps the king's options open. Development first, tactics later.",
+      "estimatedSeconds": 9,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 15,
+      "text": "Black plugs the long diagonal so the bishop on c4 can't drop into b5. Necessary, but it leaves new holes on the queenside dark squares.",
+      "estimatedSeconds": 7,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 16,
+      "text": "Pinning the knight on f6 against the queen. Now every Black piece on the kingside is tied down.",
+      "estimatedSeconds": 7,
+      "depth": "standard",
+      "highlightSquares": ["g5", "f6", "e7"]
+    },
+    {
+      "plyIndex": 17,
+      "text": "And here is the move that loses the game. Black plays b5 to kick the bishop, and it looks active — but Stockfish wanted Na6 instead, returning the gambit pawn to free the position. Pushing b5 rips open the queenside while the Black king is still stuck in the centre. Morphy doesn't need a second invitation.",
+      "estimatedSeconds": 14,
+      "depth": "deep",
+      "highlightSquares": ["b5", "a6"]
+    },
+    {
+      "plyIndex": 18,
+      "text": "The first sacrifice. Morphy doesn't retreat — he takes the pawn with the knight, opening lines toward the Black king. The engine confirms this is the only move that keeps the attack alive. If Black declines, White is just winning material. If Black takes, every White piece is about to pile in.",
+      "estimatedSeconds": 14,
+      "depth": "deep",
+      "highlightSquares": ["b5"],
+      "showEngineLine": true
+    },
+    {
+      "plyIndex": 19,
+      "text": "Black has to accept. Anything else and the knight goes berserk in the centre.",
+      "estimatedSeconds": 6,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 20,
+      "text": "Check. The king is exposed, and Morphy develops with tempo.",
+      "estimatedSeconds": 5,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 21,
+      "text": "Blocking the check with the knight is the only sensible option. But notice — the knight is pinned by the bishop, and the rook on a8 is still asleep.",
+      "estimatedSeconds": 9,
+      "depth": "standard",
+      "highlightSquares": ["d7", "b5", "a8"]
+    },
+    {
+      "plyIndex": 22,
+      "text": "Castling queenside. The rook lands on d1 with immediate pressure down the d-file, straight at the pinned knight. This is the move that turns a sacrifice into a finish.",
+      "estimatedSeconds": 10,
+      "depth": "standard",
+      "highlightSquares": ["d1", "d7"]
+    },
+    {
+      "plyIndex": 23,
+      "text": "Black defends the pinned knight. It's the only thing holding the position together.",
+      "estimatedSeconds": 6,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 24,
+      "text": "An exchange sacrifice. Morphy gives up the rook to demolish the pin and rip the d-file wide open. The point: the Black king has nowhere to run.",
+      "estimatedSeconds": 9,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 25,
+      "text": "Forced. Anything else loses immediately.",
+      "estimatedSeconds": 3.5,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 26,
+      "text": "The second rook joins on d1, pinning the rook on d7 against the king. Every White piece now has a job.",
+      "estimatedSeconds": 8,
+      "depth": "standard",
+      "highlightSquares": ["d1", "d7"]
+    },
+    {
+      "plyIndex": 27,
+      "text": "Practically forced. Qe6 is the only move that doesn't lose the queen on the spot.",
+      "estimatedSeconds": 6,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 28,
+      "text": "Morphy takes the rook with check. The Black king has no air at all.",
+      "estimatedSeconds": 6,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 29,
+      "text": "Forced — Black must recapture with the knight.",
+      "estimatedSeconds": 4,
+      "depth": "brief"
+    },
+    {
+      "plyIndex": 30,
+      "text": "Morphy finds the killer.",
+      "estimatedSeconds": 3,
+      "depth": "deep"
+    },
+    {
+      "plyIndex": 31,
+      "text": "Forced. The knight takes the queen, and d7 is suddenly empty.",
+      "estimatedSeconds": 5,
+      "depth": "standard"
+    },
+    {
+      "plyIndex": 32,
+      "text": "Checkmate. The rook delivers mate on d8, the bishop on g5 covers both d8 and the escape on e7, and the king is buried on its starting square. Morphy needed seventeen moves and finished a full queen down. Every single one of his pieces played a role.",
+      "estimatedSeconds": 14,
+      "depth": "deep",
+      "highlightSquares": ["d8", "e7", "g5"]
+    }
+  ],
+  "challenge": {
+    "plyIndex": 30,
+    "prompt": {
+      "text": "Pause the video here. It's White to move. Morphy has just played Bishop g5, pinning the knight on f6 against the queen — and his pieces are all aimed at the Black king. There is a forced mate in two. Take a moment. What would you play?",
+      "estimatedSeconds": 14
+    },
+    "thinkSeconds": 7,
+    "candidates": [
+      {
+        "san": "Rxd7+",
+        "uci": "d1d7",
+        "text": "The natural continuation of the attack — rip the knight off with check. But after Black recaptures with Queen takes d7, the queen defends comfortably, the king escapes, and Morphy has won only a knight for a rook. The mating attack is gone.",
+        "estimatedSeconds": 12
+      },
+      {
+        "san": "Qxe6+",
+        "uci": "b3e6",
+        "text": "Tempting because it forces a queen trade and looks like it wins material. But after fxe6, both queens are off the board, and Morphy has liquidated his entire attack into an equal endgame. When you're playing for the king, you don't trade queens.",
+        "estimatedSeconds": 12
+      }
+    ],
+    "reveal": {
+      "text": "The answer is Queen b8. A queen sacrifice — but with a purpose. Black is forced to play Knight takes b8, because there's no other way to stop the check. The knight is deflected off d7. And the second it leaves, the d-file is wide open. Rd8 is checkmate. Morphy traded his most powerful piece to remove the one defender keeping his rook out. Watch.",
+      "estimatedSeconds": 17
+    }
+  },
+  "outro": {
+    "text": "Morphy's lesson, played at the opera in less time than a single act: develop every piece, open lines toward the enemy king, and never spend a tempo on something that doesn't help the attack. The material count at the end is worth checking — Morphy finished a full queen down, and it didn't matter at all.",
+    "estimatedSeconds": 14
+  }
+}

@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sahil/chess-game-explainer/schemas/annotation.schema.json",
+  "title": "ChessGameAnnotation",
+  "description": "The contract between Phase 1 (analysis) and downstream phases (narration, TTS, render). Every later module consumes this shape.",
+  "type": "object",
+  "required": ["schemaVersion", "mode", "engine", "headers", "result", "plies", "keyMoments"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "mode": {
+      "description": "game = PGN/URL walkthrough. position = single-FEN analysis.",
+      "enum": ["game", "position"]
+    },
+    "engine": {
+      "type": "object",
+      "required": ["name", "flavor", "sweepDepth", "keyMomentDepth", "multiPV"],
+      "properties": {
+        "name": { "type": "string" },
+        "flavor": { "type": "string", "examples": ["lite-single"] },
+        "sweepDepth": { "type": "integer", "minimum": 1 },
+        "keyMomentDepth": { "type": "integer", "minimum": 1 },
+        "multiPV": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "headers": {
+      "description": "PGN tag pairs (Event, Site, Date, White, Black, Result, ECO, Opening, ...). May be partial.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "result": {
+      "description": "Final game result, normalized. null for raw FEN mode.",
+      "enum": ["1-0", "0-1", "1/2-1/2", "*", null]
+    },
+    "plies": {
+      "type": "array",
+      "description": "One entry per half-move played. For position mode, length is 0 and the position is stored in keyMoments[0].fenBefore.",
+      "items": { "$ref": "#/$defs/ply" }
+    },
+    "keyMoments": {
+      "type": "array",
+      "description": "4-7 moments selected for narration. For position mode, exactly one entry.",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/keyMoment" }
+    }
+  },
+  "$defs": {
+    "evaluation": {
+      "type": "object",
+      "required": ["cp", "mate", "bestMove", "pvLines", "depth"],
+      "properties": {
+        "cp": {
+          "description": "Centipawn score from White's perspective. null when position is mate-scored.",
+          "type": ["integer", "null"]
+        },
+        "mate": {
+          "description": "Mate in N plies from White's perspective (positive = White mates, negative = Black mates). null if no forced mate.",
+          "type": ["integer", "null"]
+        },
+        "bestMove": {
+          "description": "UCI notation of engine's preferred move from this position. null if game over.",
+          "type": ["string", "null"]
+        },
+        "pvLines": {
+          "type": "array",
+          "description": "Top principal variations (up to multiPV). Each is a list of UCI moves.",
+          "items": {
+            "type": "object",
+            "required": ["moves", "cp", "mate"],
+            "properties": {
+              "moves": { "type": "array", "items": { "type": "string" } },
+              "cp": { "type": ["integer", "null"] },
+              "mate": { "type": ["integer", "null"] },
+              "rank": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "depth": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ply": {
+      "type": "object",
+      "required": [
+        "plyIndex",
+        "moveNumber",
+        "sideToMove",
+        "san",
+        "uci",
+        "fenBefore",
+        "fenAfter",
+        "evalBefore",
+        "evalAfter",
+        "centipawnLoss",
+        "classification",
+        "isBookMove"
+      ],
+      "properties": {
+        "plyIndex": { "type": "integer", "minimum": 0 },
+        "moveNumber": { "type": "integer", "minimum": 1 },
+        "sideToMove": { "enum": ["w", "b"] },
+        "san": { "type": "string" },
+        "uci": { "type": "string" },
+        "fenBefore": { "type": "string" },
+        "fenAfter": { "type": "string" },
+        "evalBefore": { "$ref": "#/$defs/evaluation" },
+        "evalAfter": { "$ref": "#/$defs/evaluation" },
+        "centipawnLoss": {
+          "description": "Loss in centipawns from the mover's perspective. Capped at 1000. 0 when the mover's position was already lost (eval < -500 before).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "classification": {
+          "enum": ["best", "good", "inaccuracy", "mistake", "blunder", "book", "forced"]
+        },
+        "isBookMove": {
+          "description": "True if move is part of opening theory (heuristic: first N plies and engine agreed).",
+          "type": "boolean"
+        }
+      }
+    },
+    "keyMoment": {
+      "type": "object",
+      "required": ["plyIndex", "kind", "fenBefore", "headline"],
+      "properties": {
+        "plyIndex": {
+          "description": "Index into plies[]. -1 for position mode.",
+          "type": "integer",
+          "minimum": -1
+        },
+        "kind": {
+          "description": "Why this moment was selected.",
+          "enum": ["blunder", "mistake", "inaccuracy", "turning-point", "brilliant", "best-defense", "position"]
+        },
+        "fenBefore": { "type": "string" },
+        "headline": {
+          "description": "Short factual summary derived from the engine output (NOT narration). e.g. \"Black plays 23...Rfe8, dropping ~280 cp; engine preferred 23...Nd7.\"",
+          "type": "string"
+        },
+        "playedMove": {
+          "type": ["object", "null"],
+          "properties": {
+            "san": { "type": "string" },
+            "uci": { "type": "string" }
+          }
+        },
+        "engineBest": {
+          "type": ["object", "null"],
+          "properties": {
+            "uci": { "type": "string" },
+            "san": { "type": "string" },
+            "pv": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "evalSwing": {
+          "description": "Centipawn swing caused by the played move (from mover's perspective).",
+          "type": ["integer", "null"]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,47 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Pipeline output: keep curated sample MP4, ignore the rest
+samples/output/*
+!samples/output/.gitkeep
+!samples/output/sample.mp4
+
+# Analysis cache (regenerated from PGN)
+samples/output/.cache/
+
+# Per-shot intermediates (audio/render frames live under samples/output/, but list explicitly in case anyone reroutes them)
+samples/output/audio/
+samples/output/render/
+
+# Edge-tts intermediate files
+*.tmp.mp3
+*.tmp.wav
+
+# Test scratch dirs
+test/_*_tmp/
+test/.tmp/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
