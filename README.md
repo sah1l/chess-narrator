@@ -26,27 +26,59 @@ A 1920×1080 MP4, typically 5–7 minutes, that:
 
 ## Install as a Claude Code skill
 
-This repo is a Claude Code skill — drop it into your skills directory and Claude will auto-invoke it whenever you share a chess game and ask for a video.
+This repo is a Claude Code skill. Install it with the GitHub CLI's skill subcommand (currently in preview), then run `npm install` + `verify` to set up the Node side.
 
-**Using `gh` (recommended):**
+**User-scoped (available in every project):**
 
 ```bash
-# macOS / Linux
-gh repo clone sah1l/chess-narrator ~/.claude/skills/chess-narrator
-cd ~/.claude/skills/chess-narrator
-npm install
-node src/cli.js verify     # confirm Node, ffmpeg, Chrome, npm deps
-```
-
-```powershell
-# Windows (PowerShell)
-gh repo clone sah1l/chess-narrator "$env:USERPROFILE\.claude\skills\chess-narrator"
-cd "$env:USERPROFILE\.claude\skills\chess-narrator"
+gh skill install sah1l/chess-narrator chess-narrator --agent claude-code --scope user
+# gh prints the install path — cd into it, then:
 npm install
 node src/cli.js verify
 ```
 
-**Project-scoped install** (only available inside one repo): clone into `<project>/.claude/skills/chess-narrator/` instead.
+**Project-scoped (only inside this repo):** drop `--scope user` and run from the repo root. The skill lands in `.agents/skills/chess-narrator/`.
+
+```bash
+gh skill install sah1l/chess-narrator chess-narrator --agent claude-code
+cd .agents/skills/chess-narrator
+npm install
+node src/cli.js verify
+```
+
+**Pin to a version / commit** (avoid surprise updates):
+
+```bash
+gh skill install sah1l/chess-narrator chess-narrator --agent claude-code --scope user --pin <tag-or-sha>
+```
+
+**Update later:**
+
+```bash
+gh skill update chess-narrator
+# or all skills at once:
+gh skill update --all
+```
+
+> `gh skill` requires a reasonably recent `gh` (preview feature). If your `gh` doesn't have it yet, fall back to the clone recipe below.
+
+<details>
+<summary>Fallback: plain <code>git clone</code></summary>
+
+```bash
+# macOS / Linux
+git clone https://github.com/sah1l/chess-narrator ~/.agents/skills/chess-narrator
+cd ~/.agents/skills/chess-narrator
+npm install && node src/cli.js verify
+```
+
+```powershell
+# Windows
+git clone https://github.com/sah1l/chess-narrator "$env:USERPROFILE\.agents\skills\chess-narrator"
+cd "$env:USERPROFILE\.agents\skills\chess-narrator"
+npm install ; node src/cli.js verify
+```
+</details>
 
 Once installed, just say things like *"make a video of this Lichess game: https://lichess.org/abc123"* or *"explain this PGN as a walkthrough"* and Claude will run the pipeline. See [SKILL.md](SKILL.md) for the full trigger surface.
 
