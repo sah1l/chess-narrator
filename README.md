@@ -6,13 +6,10 @@ Designed for intermediate club players who want to understand *why* a game went 
 
 ![Node](https://img.shields.io/badge/Node-%3E%3D22-339933) ![Stockfish](https://img.shields.io/badge/Stockfish-18-lightgrey) ![License](https://img.shields.io/badge/license-MIT-blue)
 
-## Sample output
+## Sample videos
 
-Morphy's Opera Game (Paris, 1858) — the canonical attacking miniature, used as the bundled walkthrough sample.
-
-<video src="https://github.com/sah1l/chess-narrator/raw/main/skills/chess-narrator/samples/output/sample.mp4" controls width="720"></video>
-
-> If the inline player doesn't load in your markdown viewer, watch / download directly: **[skills/chess-narrator/samples/output/sample.mp4](skills/chess-narrator/samples/output/sample.mp4)** ([raw link](https://github.com/sah1l/chess-narrator/raw/main/skills/chess-narrator/samples/output/sample.mp4)).
+- [Morphy's Opera Game (Paris, 1858)](https://youtu.be/YFo5eR5-g_8) — the canonical attacking miniature
+- [My queen went on a pawn-grabbing road trip behind enemy lines](https://youtu.be/9Kj2KtpoAjc) — a personal game walkthrough
 
 ## What it produces
 
