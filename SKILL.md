@@ -1,11 +1,12 @@
 ---
-name: chess-game-explainer
-description: Turn a chess game (PGN file, Lichess/Chess.com URL, raw FEN, or inline PGN) into a narrated MP4 explainer video. Stockfish provides truth (eval, best moves, multipv); the user (or Claude) writes natural teaching narration; ffmpeg + edge-tts produce the final video. Use this skill when the user shares a chess game and wants a video that walks through every move with tiered commentary, plus one "pause and think" puzzle at a critical position.
+name: chess-narrator
+description: Turn a chess game (PGN file, Lichess/Chess.com URL, raw FEN, or inline PGN) into a narrated MP4 explainer video. Stockfish provides truth (eval, best moves, multipv); the user (or Claude) writes natural teaching narration; ffmpeg + edge-tts produce the final video. Use this skill when the user shares a chess game and wants a video that walks through every move with tiered commentary, plus one "pause and think" puzzle at a critical position. Also invoked when the user asks to verify or check the chess-narrator setup.
 when_to_use: |
   Invoke when the user:
     - shares a PGN file, Lichess game URL, Chess.com URL, raw FEN, or inline PGN AND asks for a video/explainer/walkthrough
     - asks to make a chess game "into a video", "explain a chess game", or anything similar
     - wants a narrated breakdown of a single position (FEN) — uses position mode
+    - asks to "verify chess-narrator", "check chess-narrator setup", "is chess-narrator installed", or any env-readiness question for this skill → run the verify subcommand (see Verifying the environment below)
   Do NOT use for general chess Q&A, opening theory, or position evaluation that doesn't end in a video artifact.
 allowed_tools:
   - Read
@@ -16,7 +17,7 @@ allowed_tools:
   - Grep
 ---
 
-# Chess Game Explainer
+# Chess Narrator
 
 A pipeline that converts a chess game into a narrated MP4 explainer video designed for intermediate club players. The video walks through every move with tiered commentary (book / routine / interesting / critical) and includes one "pause and think" puzzle at a critical position where the viewer is asked to find the right move.
 
@@ -38,6 +39,24 @@ Input (PGN / URL / FEN)
 - **Stockfish is truth.** Evals, best moves, multipv, brilliancies, mistakes — all decided by the engine. Claude never overrides.
 - **Claude is the teacher.** Turns the structured analysis into natural, instructive narration with a coach's voice.
 - **Renderer is delivery.** Edge-tts neural voices for narration, Chrome headless for board screenshots, ffmpeg for video stitching.
+
+## Verifying the environment
+
+When the user asks to verify the setup ("verify chess-narrator", "check the chess-narrator setup", "is everything installed?", "does this skill work on my machine?"), run a single command and report the result. Do not pre-check pieces by hand — the CLI already does it cross-platform.
+
+```bash
+node src/cli.js verify
+# Optional: --skip-network to skip the edge-tts reachability probe
+```
+
+The command prints a per-check status table (Node ≥22, stockfish/chess.js/msedge-tts npm packages, ffmpeg on PATH, Chrome/Edge/Chromium on PATH or standard install dirs, edge-tts WebSocket reachability) and exits 0 when all *required* deps are present, 1 otherwise.
+
+How to act on the result:
+
+- **All `[OK]`** → tell the user they're ready and suggest the next step (`node src/cli.js analyze <input>`).
+- **Any `[MISS]` (required)** → relay the inline install hint verbatim. Do not propose your own install commands — the hint already accounts for the user's OS. If they want help running the suggested install, offer to run it for them (with confirmation for anything that mutates system state).
+- **Any `[WARN]` (optional, e.g. msedge-tts missing or edge-tts unreachable)** → mention it but don't block. Default `system` voice still works; only `--engine edge` needs those.
+- If `node src/cli.js verify` itself fails to start (Node missing entirely, repo not installed at the expected path), fall back to telling the user how to install Node and re-clone the skill.
 
 ## End-to-end usage
 

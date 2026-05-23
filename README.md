@@ -24,16 +24,70 @@ A 1920×1080 MP4, typically 5–7 minutes, that:
 - Pauses at one critical position and asks the viewer to find the move themselves ("What would you play here?"), then explains why each plausible-looking alternative fails before revealing the answer
 - Closes with an outro that lands the lesson
 
+## Install as a Claude Code skill
+
+This repo is a Claude Code skill — drop it into your skills directory and Claude will auto-invoke it whenever you share a chess game and ask for a video.
+
+**Using `gh` (recommended):**
+
+```bash
+# macOS / Linux
+gh repo clone sah1l/chess-narrator ~/.claude/skills/chess-narrator
+cd ~/.claude/skills/chess-narrator
+npm install
+node src/cli.js verify     # confirm Node, ffmpeg, Chrome, npm deps
+```
+
+```powershell
+# Windows (PowerShell)
+gh repo clone sah1l/chess-narrator "$env:USERPROFILE\.claude\skills\chess-narrator"
+cd "$env:USERPROFILE\.claude\skills\chess-narrator"
+npm install
+node src/cli.js verify
+```
+
+**Project-scoped install** (only available inside one repo): clone into `<project>/.claude/skills/chess-narrator/` instead.
+
+Once installed, just say things like *"make a video of this Lichess game: https://lichess.org/abc123"* or *"explain this PGN as a walkthrough"* and Claude will run the pipeline. See [SKILL.md](SKILL.md) for the full trigger surface.
+
+## Verify your setup
+
+The skill ships with a one-shot env check that tells you exactly what's missing and how to install it:
+
+```bash
+node src/cli.js verify
+# or
+npm run verify
+```
+
+Sample output on a healthy machine:
+
+```
+chess-narrator environment check
+
+  [OK]   Node ≥22                 — v22.22.3
+  [OK]   stockfish (npm)
+  [OK]   chess.js (npm)
+  [OK]   msedge-tts (npm)
+  [OK]   ffmpeg on PATH           — ffmpeg version 6.1.1
+  [OK]   Chrome/Edge/Chromium     — /Applications/Google Chrome.app/…
+  [OK]   edge-tts reachable       — speech.platform.bing.com
+
+All required dependencies present.
+```
+
+When you ask Claude *"verify chess-narrator"* (or *"check the chess-narrator setup"*, *"is everything installed?"*), it will run this command and walk you through any `[MISS]` items. Use `--skip-network` to skip the edge-tts reachability probe.
+
+Required: Node 22+, ffmpeg on PATH, Chrome / Chromium / Edge. The npm deps install via `npm install`. The edge-tts network check is optional — only needed if you plan to use `--engine edge` for neural-voice narration.
+
 ## Quick start
 
 ```bash
-# 1. Install
+# 1. Clone + install (skip if already installed as a skill above)
 git clone https://github.com/sah1l/chess-narrator
 cd chess-narrator
 npm install
-# Then verify deps:
-# Windows:  powershell scripts/setup.ps1
-# *nix:     bash scripts/setup.sh
+node src/cli.js verify
 
 # 2. Analyze a game
 node src/cli.js analyze samples/sample-game.pgn

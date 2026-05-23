@@ -14,6 +14,7 @@ import {
   writeManifest,
   getRenderer,
 } from "./render/index.js";
+import { runVerify } from "./verify.js";
 
 const HELP = `chess-game-explainer
 
@@ -21,6 +22,7 @@ Usage:
   chess-game-explainer <command> [args] [options]
 
 Commands:
+  verify                                   Check that all required tools (Node, ffmpeg, Chrome, npm deps) are installed
   analyze <input>                          Run Stockfish analysis → annotation.json
   narrate-prompt <annotation.json>         Print the prompt Claude should use to write narration
   build-script <annotation.json> <narration.json>
@@ -75,6 +77,9 @@ Options (render):
   --mp4 <path>            MP4 output path when --renderer is set
                           (default: samples/output/video.mp4)
 
+Options (verify):
+  --skip-network          Skip the optional network reachability check for edge-tts
+
 Global:
   --help                  Show this message
 `;
@@ -87,6 +92,8 @@ async function main(argv) {
   }
   const cmd = args[0];
   switch (cmd) {
+    case "verify":
+      return cmdVerify(args.slice(1));
     case "analyze":
       return cmdAnalyze(args.slice(1));
     case "narrate-prompt":
@@ -103,6 +110,19 @@ async function main(argv) {
       process.stderr.write(`Unknown command: ${cmd}\n${HELP}`);
       process.exit(1);
   }
+}
+
+async function cmdVerify(args) {
+  const { values } = parseArgs({
+    args,
+    options: {
+      "skip-network": { type: "boolean" },
+      help: { type: "boolean" },
+    },
+  });
+  if (values.help) return process.stdout.write(HELP);
+  const { ok } = await runVerify({ skipNetwork: values["skip-network"] });
+  process.exit(ok ? 0 : 1);
 }
 
 async function cmdAnalyze(args) {

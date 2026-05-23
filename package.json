@@ -1,17 +1,18 @@
 {
-  "name": "chess-game-explainer",
+  "name": "chess-narrator",
   "version": "0.1.0",
-  "description": "A Claude Skill that turns a chess game into a narrated explainer video. Stockfish provides truth; Claude turns truth into teaching; HyperFrames renders the video.",
+  "description": "A Claude Skill that turns a chess game into a narrated explainer video. Stockfish provides truth; Claude turns truth into teaching; ffmpeg + edge-tts render the video.",
   "type": "module",
   "license": "MIT",
   "engines": {
     "node": ">=22"
   },
   "bin": {
-    "chess-game-explainer": "src/cli.js"
+    "chess-narrator": "src/cli.js"
   },
   "scripts": {
     "test": "node --test test/*.test.js",
+    "verify": "node src/cli.js verify",
     "analyze": "node src/cli.js analyze"
   },
   "dependencies": {
