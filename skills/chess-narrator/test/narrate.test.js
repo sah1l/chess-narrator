@@ -34,23 +34,58 @@ test("validateNarration rejects missing schemaVersion", () => {
   assert.ok(errors.some((e) => /schemaVersion/.test(e)));
 });
 
-test("validateNarration rejects mismatched challenge.plyIndex", async () => {
-  const annotation = await loadJson("samples/output/annotation.json");
-  const narration = await loadJson("samples/sample-narration.json");
-  const broken = {
-    ...narration,
-    challenge: { ...narration.challenge, plyIndex: narration.challenge.plyIndex + 2 },
+test("validateNarration rejects mismatched challenge.plyIndex", () => {
+  const annotation = {
+    plies: [
+      { plyIndex: 0 },
+      { plyIndex: 1 },
+    ],
+    challenge: { plyIndex: 0 },
   };
-  const { valid, errors } = validateNarration(broken, annotation);
+  const narration = {
+    schemaVersion: "1.2.0",
+    title: "Test Game",
+    intro: { text: "Welcome to this game", estimatedSeconds: 5 },
+    segments: [
+      { plyIndex: 0, text: "First move", estimatedSeconds: 5 },
+      { plyIndex: 1, text: "Second move", estimatedSeconds: 5 },
+    ],
+    outro: { text: "Thanks for watching", estimatedSeconds: 5 },
+    challenge: {
+      plyIndex: 2,
+      prompt: { text: "What would you play here?", estimatedSeconds: 8 },
+      thinkSeconds: 5,
+      candidates: [
+        { san: "e4", uci: "e2e4", text: "e4 is best", estimatedSeconds: 6 },
+      ],
+      reveal: { text: "e4 was correct!", estimatedSeconds: 8 },
+    },
+  };
+  const { valid, errors } = validateNarration(narration, annotation);
   assert.equal(valid, false);
   assert.ok(errors.some((e) => /challenge\.plyIndex mismatch/.test(e)));
 });
 
-test("validateNarration requires challenge when annotation has one", async () => {
-  const annotation = await loadJson("samples/output/annotation.json");
-  const narration = await loadJson("samples/sample-narration.json");
-  const stripped = { ...narration, challenge: null };
-  const { valid, errors } = validateNarration(stripped, annotation);
+test("validateNarration requires challenge when annotation has one", () => {
+  const annotation = {
+    plies: [
+      { plyIndex: 0 },
+      { plyIndex: 1 },
+    ],
+    challenge: { plyIndex: 0 },
+  };
+  const narration = {
+    schemaVersion: "1.2.0",
+    title: "Test Game",
+    intro: { text: "Welcome to this game", estimatedSeconds: 5 },
+    segments: [
+      { plyIndex: 0, text: "First move", estimatedSeconds: 5 },
+      { plyIndex: 1, text: "Second move", estimatedSeconds: 5 },
+    ],
+    outro: { text: "Thanks for watching", estimatedSeconds: 5 },
+    // deliberately omit challenge
+  };
+  const { valid, errors } = validateNarration(narration, annotation);
   assert.equal(valid, false);
   assert.ok(errors.some((e) => /narration\.challenge is null/.test(e)));
 });
@@ -133,9 +168,46 @@ test("buildShotList produces title + intro + per-ply shots + challenge expansion
   assert.equal(script.shots[script.shots.length - 1].kind, "outro");
 });
 
-test("buildShotList replaces challenge ply with prompt/think/candidates/reveal sequence", async () => {
-  const annotation = await loadJson("samples/output/annotation.json");
-  const narration = await loadJson("samples/sample-narration.json");
+test("buildShotList replaces challenge ply with prompt/think/candidates/reveal sequence", () => {
+  const plies = [
+    {
+      plyIndex: 0, moveNumber: 1, sideToMove: "w", san: "e4", uci: "e2e4",
+      fenBefore: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      fenAfter: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+      evalBefore: { cp: 30 }, evalAfter: { cp: 28 },
+    },
+    {
+      plyIndex: 1, moveNumber: 1, sideToMove: "b", san: "e5", uci: "e7e5",
+      fenBefore: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+      fenAfter: "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+      evalBefore: { cp: 28 }, evalAfter: { cp: 25 },
+    },
+  ];
+  const annotation = {
+    plies,
+    keyMoments: [],
+    challenge: { plyIndex: 0 },
+  };
+  const narration = {
+    schemaVersion: "1.2.0",
+    title: "Test Game",
+    intro: { text: "Welcome to this game", estimatedSeconds: 5 },
+    segments: [
+      { plyIndex: 0, text: "e4 is played", estimatedSeconds: 5 },
+      { plyIndex: 1, text: "e5 in response", estimatedSeconds: 5 },
+    ],
+    outro: { text: "Thanks for watching", estimatedSeconds: 5 },
+    challenge: {
+      plyIndex: 0,
+      prompt: { text: "What would you play here?", estimatedSeconds: 8 },
+      thinkSeconds: 5,
+      candidates: [
+        { san: "d4", uci: "d2d4", text: "d4 is an option", estimatedSeconds: 6 },
+        { san: "Nf3", uci: "g1f3", text: "Nf3 develops", estimatedSeconds: 6 },
+      ],
+      reveal: { text: "e4 was correct!", estimatedSeconds: 8 },
+    },
+  };
   const script = buildShotList(annotation, narration);
   const cPly = narration.challenge.plyIndex;
 
@@ -158,7 +230,7 @@ test("buildShotList replaces challenge ply with prompt/think/candidates/reveal s
   assert.equal(think.narration, null);
   // reveal carries the answer move + a green "answer" arrow
   const reveal = cplyShots[cplyShots.length - 1];
-  assert.equal(reveal.answer.san, annotation.plies[cPly].san);
+  assert.equal(reveal.answer.san, plies[cPly].san);
   assert.equal(reveal.arrows[0].role, "answer");
   // candidates each carry a "wrong" arrow
   for (let i = 2; i < kinds.length - 1; i++) {

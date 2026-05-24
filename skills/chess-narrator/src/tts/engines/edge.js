@@ -3,6 +3,7 @@ import { mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+import { escapeXml, trackChild } from "../../utils.js";
 
 /**
  * Edge-TTS adapter — uses Microsoft Edge's neural voices via the public
@@ -116,7 +117,7 @@ function mp3ToWav(mp3Path, wavPath) {
       "-ac", "1",
       wavPath,
     ];
-    const ff = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
+    const ff = trackChild(spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] }));
     let err = "";
     ff.stderr.on("data", (d) => (err += d.toString()));
     ff.on("error", (e) => {
@@ -131,9 +132,3 @@ function mp3ToWav(mp3Path, wavPath) {
   });
 }
 
-function escapeXml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}

@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { uciToSan } from "../utils.js";
 
 /**
  * Combine annotation + narration into a final "shot list" — the ordered
@@ -33,7 +34,9 @@ export function buildShotList(annotation, narration) {
     id: "title",
     kind: "title",
     title: narration.title,
-    subtitle: narration.subtitle ?? defaultSubtitle(annotation),
+    // Trim so an empty/whitespace subtitle from the LLM falls back to default
+    // instead of rendering an empty card.
+    subtitle: narration.subtitle?.trim() || defaultSubtitle(annotation),
     durationSec: 4,
     narration: null,
   });
@@ -99,7 +102,7 @@ export function buildShotList(annotation, narration) {
   return {
     schemaVersion: "1.1.0",
     title: narration.title,
-    subtitle: narration.subtitle ?? null,
+    subtitle: narration.subtitle?.trim() || null,
     totalSeconds,
     shots,
   };
@@ -138,7 +141,7 @@ function buildPlyShot(ply, km, seg, idx) {
   let engineBest = null;
   if (engineUci) {
     const san =
-      km?.engineBest?.san ?? uciToSanSafe(ply.fenBefore, engineUci);
+      km?.engineBest?.san ?? uciToSan(ply.fenBefore, engineUci);
     const pv = km?.engineBest?.pv ?? [engineUci];
     engineBest = { uci: engineUci, san: san ?? engineUci, pv };
   }
@@ -319,21 +322,6 @@ function uciToArrow(uci, role) {
     promotion: uci.length > 4 ? uci[4] : null,
     role, // "played" or "engine"
   };
-}
-
-function uciToSanSafe(fen, uci) {
-  if (!fen || !uci) return null;
-  try {
-    const b = new Chess(fen);
-    const m = b.move({
-      from: uci.slice(0, 2),
-      to: uci.slice(2, 4),
-      promotion: uci.length > 4 ? uci[4] : undefined,
-    });
-    return m?.san ?? null;
-  } catch {
-    return null;
-  }
 }
 
 function expandEngineLine(fen, uciPv, maxPlies) {

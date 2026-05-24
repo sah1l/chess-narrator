@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { renderShotPage, FRAME_WIDTH, FRAME_HEIGHT } from "./templates.js";
+import { slugifyId, toForwardSlash } from "../utils.js";
 
 /**
  * Write one HTML file per shot plus a manifest.json describing the timeline.
@@ -29,7 +30,8 @@ export async function writeManifest(script, outDir) {
 
   for (const shot of script.shots) {
     const html = renderShotPage(shot, ctx);
-    const htmlPath = path.join(shotsDir, `${shot.id}.html`);
+    const safeId = slugifyId(shot.id);
+    const htmlPath = path.join(shotsDir, `${safeId}.html`);
     await writeFile(htmlPath, html);
     shotEntries.push({
       id: shot.id,
@@ -51,7 +53,9 @@ export async function writeManifest(script, outDir) {
     frame: { width: FRAME_WIDTH, height: FRAME_HEIGHT, fps: 30 },
     audio: script.audio
       ? {
-          ...script.audio,
+          engine: script.audio.engine,
+          voice: script.audio.voice,
+          rate: script.audio.rate,
           outDir: script.audio.outDir
             ? toForwardSlash(path.relative(outDir, script.audio.outDir))
             : null,
@@ -63,10 +67,6 @@ export async function writeManifest(script, outDir) {
   const manifestPath = path.join(outDir, "manifest.json");
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
   return { manifestPath, manifest };
-}
-
-function toForwardSlash(p) {
-  return p.split(path.sep).join("/");
 }
 
 function round2(n) {

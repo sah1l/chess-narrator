@@ -127,7 +127,12 @@ async function checkBrowser() {
     if (p) return { ok: true, detail: `${name} → ${shortPath(p)}` };
   }
   // Well-known install locations
-  const fallbacks = platform() === "win32" ? winBrowserFallbacks() : macBrowserFallbacks();
+  const fallbacks =
+    platform() === "win32"
+      ? winBrowserFallbacks()
+      : platform() === "darwin"
+        ? macBrowserFallbacks()
+        : linuxBrowserFallbacks();
   for (const p of fallbacks) {
     if (await fileExists(p)) return { ok: true, detail: shortPath(p) };
   }
@@ -185,6 +190,19 @@ function macBrowserFallbacks() {
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/Applications/Chromium.app/Contents/MacOS/Chromium",
     "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  ];
+}
+
+function linuxBrowserFallbacks() {
+  return [
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/microsoft-edge",
+    "/usr/bin/microsoft-edge-stable",
+    "/snap/bin/chromium",
+    "/snap/bin/google-chrome",
   ];
 }
 

@@ -77,8 +77,11 @@ export function evalToCp(ev, pov) {
   if (ev.mate != null) {
     // mate-in-N from White's POV; convert to mover-POV centipawns.
     // Closer mate = larger magnitude.
+    // mate>0: White mates in N    mate<0: Black mates in N
+    // mate=0: side-to-move is checkmated (opposite side won)
+    //         — equivalently positive from the winner's POV.
     const mag = MATE_SCORE - Math.min(Math.abs(ev.mate), 99) * 10;
-    return ev.mate > 0 ? sign * mag : -sign * mag;
+    return ev.mate >= 0 ? sign * mag : -sign * mag;
   }
   if (ev.cp != null) return ev.cp * sign;
   return 0;

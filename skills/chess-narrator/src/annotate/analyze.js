@@ -6,6 +6,7 @@ import { createEngine } from "../engine/stockfish.js";
 import { classifyMove, classifyTerminal, CLASSIFICATION } from "./classify.js";
 import { selectKeyMoments } from "./keymoments.js";
 import { pickChallenge } from "./challenge.js";
+import { pvScalar } from "../utils.js";
 
 const SCHEMA_VERSION = "1.1.0";
 const DEFAULT_OPENING_PLIES = 10; // first 5 full moves treated as theory candidates
@@ -47,7 +48,12 @@ export async function analyzeGame(parsed, opts = {}) {
     for (let i = 0; i < parsed.plies.length; i++) {
       const p = parsed.plies[i];
       const evalBefore = evals[i];
-      const evalAfter = evals[i + 1];
+      // For the final ply, evals[i+1] only exists if we evaluated the
+      // resulting position (always true with collectPositions). If the game
+      // is truncated mid-play and the resulting eval is missing, fall back
+      // to evalBefore so classifyMove still gets a defined value rather
+      // than producing an undefined-driven misclassification.
+      const evalAfter = evals[i + 1] ?? evalBefore;
 
       const isBookMove = i < openingPlies && bookHeuristic(evalBefore, p.uci);
       const terminal = terminalStateOf(p.fenAfter);
@@ -174,12 +180,6 @@ function bookHeuristic(evalBefore, playedUci) {
   return evalBefore.pvLines.some((pv) => pv.moves?.[0] === playedUci);
 }
 
-function pvScalar(pv) {
-  if (pv.cp != null) return pv.cp;
-  if (pv.mate != null) return pv.mate > 0 ? 10000 - pv.mate * 10 : -10000 - pv.mate * 10;
-  return null;
-}
-
 /**
  * Inspect fenAfter; return a terminal-state tag or null if the game continues.
  */
@@ -223,7 +223,12 @@ export async function analyzeGameCached(parsed, opts, cacheDir) {
     await mkdir(cacheDir, { recursive: true });
     await writeFile(file, JSON.stringify(annotation, null, 2));
   }
-  if (opts.noChallenge) annotation.challenge = null;
+  if (opts.noChallenge) {
+    // Shallow-clone before mutating: if the caller (or a future second
+    // reader) holds a reference to the cached object, we don't want to
+    // permanently destroy the challenge data.
+    annotation = { ...annotation, challenge: null };
+  }
   return { annotation, fromCache };
 }
 
