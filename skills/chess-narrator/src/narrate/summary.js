@@ -1,4 +1,4 @@
-import { Chess } from "chess.js";
+import { uciToSan, uciPvToSan } from "../utils.js";
 
 /**
  * Boil a full annotation down to a compact briefing object that's small enough
@@ -230,7 +230,7 @@ function describeEval(ev) {
   if (ev.cp != null) {
     const v = (ev.cp / 100).toFixed(2);
     if (ev.cp >= 50) return `White +${v}`;
-    if (ev.cp <= -50) return `Black +${Math.abs(v).toFixed ? Math.abs(v).toFixed(2) : Math.abs(v)}`;
+    if (ev.cp <= -50) return `Black +${Math.abs(v).toFixed(2)}`;
     return `roughly equal (${v})`;
   }
   return "n/a";
@@ -248,40 +248,4 @@ function swingFromPly(ply) {
   if (before == null || after == null) return null;
   const sign = ply.sideToMove === "b" ? -1 : 1;
   return (after - before) * sign;
-}
-
-function uciPvToSan(fen, uciPv, maxPlies = 6) {
-  if (!fen || !Array.isArray(uciPv)) return [];
-  const board = new Chess(fen);
-  const out = [];
-  for (let i = 0; i < Math.min(uciPv.length, maxPlies); i++) {
-    const u = uciPv[i];
-    try {
-      const m = board.move({
-        from: u.slice(0, 2),
-        to: u.slice(2, 4),
-        promotion: u.length > 4 ? u[4] : undefined,
-      });
-      if (!m) break;
-      out.push(m.san);
-    } catch {
-      break;
-    }
-  }
-  return out;
-}
-
-function uciToSan(fen, uci) {
-  if (!fen || !uci) return null;
-  try {
-    const board = new Chess(fen);
-    const m = board.move({
-      from: uci.slice(0, 2),
-      to: uci.slice(2, 4),
-      promotion: uci.length > 4 ? uci[4] : undefined,
-    });
-    return m?.san ?? null;
-  } catch {
-    return null;
-  }
 }

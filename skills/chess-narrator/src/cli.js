@@ -15,6 +15,32 @@ import {
   getRenderer,
 } from "./render/index.js";
 import { runVerify } from "./verify.js";
+import {
+  assertPositiveInt,
+  assertSignedInt,
+  childProcesses,
+} from "./utils.js";
+
+let shuttingDown = false;
+function installSignalHandlers() {
+  const handle = (sig) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    process.stderr.write(`\nReceived ${sig}, terminating child processes…\n`);
+    for (const child of childProcesses) {
+      try { child.kill("SIGTERM"); } catch { /* already gone */ }
+    }
+    // Give children a moment to exit cleanly, then force.
+    setTimeout(() => {
+      for (const child of childProcesses) {
+        try { child.kill("SIGKILL"); } catch { /* already gone */ }
+      }
+      process.exit(130);
+    }, 1500).unref();
+  };
+  process.on("SIGINT", () => handle("SIGINT"));
+  process.on("SIGTERM", () => handle("SIGTERM"));
+}
 
 const HELP = `chess-game-explainer
 
@@ -87,6 +113,7 @@ Global:
 `;
 
 async function main(argv) {
+  installSignalHandlers();
   const args = argv.slice(2);
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
     process.stdout.write(HELP);
@@ -152,11 +179,11 @@ async function cmdAnalyze(args) {
   }
 
   const input = positionals[0];
-  const sweepDepth = parseInt(values.depth ?? "10", 10);
-  const keyMomentDepth = parseInt(values["key-depth"] ?? "18", 10);
-  const positionDepth = parseInt(values["position-depth"] ?? "20", 10);
-  const multiPV = parseInt(values.multipv ?? "3", 10);
-  const openingPlies = parseInt(values["opening-plies"] ?? "10", 10);
+  const sweepDepth = assertPositiveInt("--depth", values.depth, 10);
+  const keyMomentDepth = assertPositiveInt("--key-depth", values["key-depth"], 18);
+  const positionDepth = assertPositiveInt("--position-depth", values["position-depth"], 20);
+  const multiPV = assertPositiveInt("--multipv", values.multipv, 3);
+  const openingPlies = assertPositiveInt("--opening-plies", values["opening-plies"], 10);
   const outPath = path.resolve(values.out ?? "samples/output/annotation.json");
   const cacheDir = path.resolve(values["cache-dir"] ?? "samples/output/.cache");
 
@@ -312,7 +339,7 @@ async function cmdSynthesize(args) {
 
   const script = JSON.parse(await readFile(scriptPath, "utf8"));
   const engineName = values.engine ?? "system";
-  const rate = values.rate != null ? parseInt(values.rate, 10) : undefined;
+  const rate = assertSignedInt("--rate", values.rate, undefined);
 
   log(`Synthesizing with engine=${engineName}${values.voice ? `, voice=${values.voice}` : ""} → ${audioDir}`);
   const t0 = Date.now();
