@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { access, constants } from "node:fs/promises";
 import { platform } from "node:os";
 import { createRequire } from "node:module";
+import { HF_VERSION } from "./render/hyperframes.js";
 
 const require = createRequire(import.meta.url);
 
@@ -26,6 +27,7 @@ export async function runVerify({ skipNetwork = false } = {}) {
     { name: "msedge-tts (npm)", required: false, run: checkEdgeTtsPkg },
     { name: "ffmpeg on PATH", required: true, run: checkFfmpeg },
     { name: "Chrome/Edge/Chromium", required: true, run: checkBrowser },
+    { name: "hyperframes CLI", required: false, run: checkHyperframes },
   ];
   if (!skipNetwork) {
     checks.push({ name: "edge-tts reachable", required: false, run: checkEdgeTtsNetwork });
@@ -144,6 +146,42 @@ async function checkBrowser() {
         : platform() === "darwin"
           ? "Install via: brew install --cask google-chrome"
           : "Install via: apt install chromium  (or google-chrome-stable)",
+  };
+}
+
+async function checkHyperframes() {
+  // The continuous renderer (default) shells out to `npx hyperframes`. Probe
+  // WITHOUT installing so verify stays fast and offline-safe: if the pinned
+  // version is already in the npx cache it's ready; otherwise it's fetched on
+  // first render (needs internet once), and ffmpeg is the offline fallback.
+  const probe = await new Promise((resolve) => {
+    const child = spawn(`npx --no-install hyperframes@${HF_VERSION} --version`, {
+      shell: true,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    const t = setTimeout(() => {
+      child.kill();
+      resolve({ ok: false });
+    }, 15000);
+    child.stdout?.on("data", (d) => (out += d.toString()));
+    child.on("error", () => {
+      clearTimeout(t);
+      resolve({ ok: false });
+    });
+    child.on("close", (code) => {
+      clearTimeout(t);
+      resolve({ ok: code === 0, version: out.trim() || null });
+    });
+  });
+  if (probe.ok) {
+    return { ok: true, detail: `cached v${probe.version ?? HF_VERSION} (default renderer)` };
+  }
+  return {
+    ok: false,
+    detail: "not cached",
+    hint: `Default renderer. Fetched on first render via 'npx hyperframes@${HF_VERSION}' (needs internet once). No network? render with --renderer ffmpeg.`,
   };
 }
 

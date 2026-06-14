@@ -1,6 +1,6 @@
 ---
 name: chess-narrator
-description: Turn a chess game (PGN file, Lichess/Chess.com URL, raw FEN, or inline PGN) into a narrated MP4 explainer video. Stockfish provides truth (eval, best moves, multipv); the user (or Claude) writes natural teaching narration; ffmpeg + edge-tts produce the final video. Use this skill when the user shares a chess game and wants a video that walks through every move with tiered commentary, plus one "pause and think" puzzle at a critical position. Also invoked when the user asks to verify or check the chess-narrator setup.
+description: Turn a chess game (PGN file, Lichess/Chess.com URL, raw FEN, or inline PGN) into a narrated MP4 explainer video — continuous gameplay where the pieces slide move-to-move and the evaluation bar moves live. Stockfish provides truth (eval, best moves, multipv); the user (or Claude) writes natural teaching narration; edge-tts + HyperFrames produce the final animated video. Obvious moves slide by quickly, critical moments get full commentary, plus one "pause and think" puzzle — a typical game runs 5–7 minutes. Use this skill when the user shares a chess game and wants a video/explainer/walkthrough. Also invoked when the user asks to verify or check the chess-narrator setup.
 when_to_use: |
   Invoke when the user:
     - shares a PGN file, Lichess game URL, Chess.com URL, raw FEN, or inline PGN AND asks for a video/explainer/walkthrough
@@ -19,7 +19,7 @@ allowed_tools:
 
 # Chess Narrator
 
-A pipeline that converts a chess game into a narrated MP4 explainer video designed for intermediate club players. The video walks through every move with tiered commentary (book / routine / interesting / critical) and includes one "pause and think" puzzle at a critical position where the viewer is asked to find the right move.
+A pipeline that converts a chess game into a narrated MP4 explainer video designed for intermediate club players. The video plays as **continuous gameplay** — one board where the pieces slide move-to-move and the evaluation bar rises and falls live — pausing only at the moments that matter. Obvious moves slide by quickly; critical decisions get the full coach treatment, plus one "pause and think" puzzle. A typical game lands in the **5–7 minute** range.
 
 ## Architecture (three layers, one direction)
 
@@ -27,18 +27,18 @@ A pipeline that converts a chess game into a narrated MP4 explainer video design
 Input (PGN / URL / FEN)
         │
         ▼
-[Stockfish]  ── analyze.json (per-ply evals, classifications, key moments, challenge pick)
+[Stockfish]  ── annotation.json (per-ply evals, classifications, key moments, challenge pick)
         │
         ▼
-[Claude]     ── narration.json (intro/segments/challenge/outro, one segment per ply)
+[Claude]     ── narration.json (intro/segments/challenge/outro, one segment per ply, paced)
         │
         ▼
-[edge-tts + ffmpeg]  ── video.mp4 (1920x1080, ~5–7 min for a typical game)
+[edge-tts + HyperFrames]  ── video.mp4 (1920x1080 continuous animation, ~5–7 min)
 ```
 
 - **Stockfish is truth.** Evals, best moves, multipv, brilliancies, mistakes — all decided by the engine. Claude never overrides.
-- **Claude is the teacher.** Turns the structured analysis into natural, instructive narration with a coach's voice.
-- **Renderer is delivery.** Edge-tts neural voices for narration, Chrome headless for board screenshots, ffmpeg for video stitching.
+- **Claude is the teacher.** Turns the structured analysis into natural, instructive narration with a coach's voice, paced to the engine-derived tiers.
+- **Renderer is delivery.** Edge-tts neural voices for narration; **HyperFrames** (default) renders one animated composition — sliding pieces + a live eval bar — deterministically frame-by-frame to MP4. The legacy **ffmpeg** still renderer (one static board per shot) remains as an offline fallback.
 
 ## Verifying the environment
 
@@ -49,7 +49,7 @@ node src/cli.js verify
 # Optional: --skip-network to skip the edge-tts reachability probe
 ```
 
-The command prints a per-check status table (Node ≥22, stockfish/chess.js/msedge-tts npm packages, ffmpeg on PATH, Chrome/Edge/Chromium on PATH or standard install dirs, edge-tts WebSocket reachability) and exits 0 when all *required* deps are present, 1 otherwise.
+The command prints a per-check status table (Node ≥22, stockfish/chess.js/msedge-tts npm packages, ffmpeg on PATH, Chrome/Edge/Chromium on PATH or standard install dirs, the HyperFrames CLI, edge-tts WebSocket reachability) and exits 0 when all *required* deps are present, 1 otherwise. The HyperFrames CLI check is a `[WARN]` (not required): it is fetched automatically via `npx` on the first render and the ffmpeg renderer is the offline fallback.
 
 How to act on the result:
 
@@ -75,7 +75,9 @@ node src/cli.js build-script samples/output/annotation.json my-narration.json
 # 5. Synthesize narration audio (edge-tts neural voices, ~2 min for 30+ shots):
 node src/cli.js synthesize samples/output/script.json --engine edge
 
-# 6. Render the MP4:
+# 6. Render the MP4 (default renderer = hyperframes, continuous animation):
+node src/cli.js render samples/output/script.audio.json --mp4 video.mp4
+#    Offline / no HyperFrames CLI? fall back to the still renderer:
 node src/cli.js render samples/output/script.audio.json --renderer ffmpeg --mp4 video.mp4
 ```
 
@@ -122,16 +124,17 @@ The `narrate-prompt` command produces a system + user prompt pair. The user prom
 - A per-ply briefing with: move SAN, evaluation before/after, classification, tier (book/routine/interesting/critical), engine alternative if relevant
 - (Optional) a CHALLENGE block describing one ply where the viewer should pause and think — including the engine's top multipv lines
 
-Claude returns a single JSON object conforming to `schemas/narration.schema.json` (currently v1.2.0):
+Claude returns a single JSON object conforming to `schemas/narration.schema.json` (currently v1.3.0):
 
 ```json
 {
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "title": "...",
   "subtitle": "...",
   "intro": { "text": "...", "estimatedSeconds": 14 },
   "segments": [
-    { "plyIndex": 0, "text": "...", "estimatedSeconds": 3.5, "depth": "brief" },
+    { "plyIndex": 0, "text": "", "estimatedSeconds": 0, "pace": "silent" },
+    { "plyIndex": 11, "text": "...", "estimatedSeconds": 12, "pace": "full", "depth": "deep" },
     ...
   ],
   "challenge": {
@@ -153,14 +156,17 @@ Validation rules (enforced by `build-script`):
 - `segments[i].plyIndex === plies[i].plyIndex`
 - If `annotation.challenge != null`, `narration.challenge` must be present with matching `plyIndex`
 
-## Tiered narration depths
+## Pacing & narration depth
 
-| Tier | Trigger | Length | What to write |
+Every ply carries an engine-derived **pace** that controls how much screen time it earns. This is what keeps the video in the 5–7 minute range: most moves slide by, and the coach only stops to talk at the moments that matter. Pace is derived from the commentary tier and **recomputed authoritatively by `build-script`** from the annotation — so a quiet move can't be padded into a long one, regardless of what the narration says.
+
+| Pace | From tier | On screen | Narration |
 |---|---|---|---|
-| **book** | `isBookMove === true` | 3–5s, 1 sentence | Name the opening idea, not the move |
-| **routine** | `best`/`good`, no engine disagreement | 4–7s, 1–2 sentences | What the move does + plan it supports |
-| **interesting** | `best`/`good`, engine had a clear preference | 6–10s, 2–3 sentences | Played move + engine's preference + why one was chosen |
-| **critical** | `inaccuracy`/`mistake`/`blunder`/key moment | 10–18s, 3–5 sentences | Full coach treatment: intent, engine line, consequence |
+| **silent** | book | piece slides (~1s), no voice | `text: ""` (none) |
+| **brief** | routine / interesting | quick slide + one short line | 1 clause, ~1.5–3s |
+| **full** | critical — `inaccuracy`/`mistake`/`blunder`/`brilliant`/`turning-point`/key moment | board holds, arrows + highlights, full coach treatment | 3–5 sentences, 8–18s |
+
+So the opening and quiet maneuvering play as a near-silent montage of sliding pieces; the engine's mistakes, brilliancies, and turning points are where the video slows down and the narrator speaks. The narration prompt prints the pace next to every move, and the continuous renderer animates each accordingly. The `pace`↔tier mapping lives in `src/narrate/summary.js` (`tierToPace`).
 
 ## Challenge moment (pause and think)
 
@@ -176,16 +182,20 @@ Skipped when no qualifying moment exists (short games, no brilliancies).
 
 ## Engines, voices, and renderers
 
-- **TTS engines:** `system` (Windows SAPI, free, robotic), `edge` (Microsoft Edge neural, free, requires internet + ffmpeg, recommended), `kokoro` (offline neural, future), `hyperframes` (cloud, future)
+- **TTS engines:** `system` (Windows SAPI, free, robotic), `edge` (Microsoft Edge neural, free, requires internet + ffmpeg, recommended), `kokoro` (offline neural, future)
 - **Default voice (edge):** `en-US-AndrewMultilingualNeural` — warm narrator. Try `en-US-GuyNeural` (clear broadcast) or `en-US-ChristopherNeural` (deeper).
-- **Renderers:** `ffmpeg` (default, requires Chrome + ffmpeg on PATH), `hyperframes` (cloud, future).
+- **Renderers:**
+  - `hyperframes` (**default**) — continuous animated board + live eval bar, rendered deterministically frame-by-frame to MP4. Fetched via `npx hyperframes` on first use (needs internet once, then cached) and brings its own Chromium + ffmpeg.
+  - `ffmpeg` — still-slideshow fallback (one static board per shot, looped under its audio). Needs Chrome/Edge + ffmpeg on PATH. Use it for fully offline renders: `--renderer ffmpeg`.
+- **Board themes (`--board-theme`, hyperframes renderer):** `green` (default, Chess.com look), `brown` (lichess), `blue` (cool slate). The board always shows file letters `a`–`h` and rank numbers `1`–`8` so the commentary's square references line up. When the user asks for a particular board color/style, pass it through — e.g. `--board-theme brown`.
 
 ## External dependencies
 
 - **Node ≥22**
 - **Stockfish** (npm package `stockfish` — auto-installed)
-- **ffmpeg** on PATH (for `--engine edge` and `--renderer ffmpeg`)
-- **Chrome / Chromium** on PATH (for headless board screenshots)
+- **ffmpeg** on PATH (for `--engine edge` and `--renderer ffmpeg`; the hyperframes CLI bundles its own for rendering)
+- **Chrome / Chromium** on PATH (for the ffmpeg renderer's headless screenshots; hyperframes manages its own browser)
+- **HyperFrames CLI** (default renderer) — auto-fetched via `npx hyperframes` on first render (internet once, then cached)
 
 Run `scripts/setup.ps1` (Windows) or `scripts/setup.sh` (macOS/Linux) to verify the environment.
 

@@ -5,11 +5,24 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { readWavDuration } from "../src/tts/duration.js";
-import { synthesizeScript } from "../src/tts/synthesize.js";
+import { synthesizeScript, normalizeForTts } from "../src/tts/synthesize.js";
 import { getEngine } from "../src/tts/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TMP = path.join(__dirname, "_tts_tmp");
+
+test("normalizeForTts turns dashes into spoken pauses", () => {
+  // em dash → comma pause (not read aloud as "dash")
+  assert.equal(normalizeForTts("safety — but watch out"), "safety, but watch out");
+  // ASCII double hyphen → pause
+  assert.equal(normalizeForTts("forced -- no choice"), "forced, no choice");
+  // en dash mid-text
+  assert.equal(normalizeForTts("the f7–square"), "the f7, square");
+  // clean text is left intact
+  assert.equal(normalizeForTts("Castling, tucking the king away."), "Castling, tucking the king away.");
+  // does not pile up commas when a dash sits next to existing punctuation
+  assert.equal(normalizeForTts("solid, — and safe"), "solid, and safe");
+});
 
 /**
  * Build a minimal valid PCM WAV for a given duration. Generates silence.

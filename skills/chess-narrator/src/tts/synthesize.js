@@ -46,7 +46,9 @@ export async function synthesizeScript(script, opts) {
     const audioPath = path.join(outDir, `${slugifyId(shot.id)}.wav`);
     onProgress?.({ shotId: shot.id, i: i + 1, total: shotsWithNarration.length });
     await engine.synthesize({
-      text: shot.narration,
+      // Speak normalized text (dashes → pauses) so the voice doesn't read out
+      // "dash dash"; the on-screen caption keeps the original punctuation.
+      text: normalizeForTts(shot.narration),
       outPath: audioPath,
       voice,
       rate,
@@ -77,4 +79,18 @@ export async function synthesizeScript(script, opts) {
 
 function round2(n) {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Make narration speak cleanly. TTS engines read "—" and "--" literally
+ * ("dash"), so turn every kind of dash into a comma pause. Only the spoken
+ * audio is affected — the displayed caption keeps the original text.
+ */
+export function normalizeForTts(text) {
+  return String(text ?? "")
+    .replace(/\s*[‒–—―−]\s*/g, ", ") // figure/en/em/horizontal/minus dash
+    .replace(/\s*--+\s*/g, ", ") // ASCII double hyphen
+    .replace(/\s*,\s*,+/g, ", ") // collapse doubled commas
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
