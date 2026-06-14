@@ -13,7 +13,10 @@
  * Returns { valid, errors[] }. Doesn't throw — callers decide how to react.
  */
 
+import { paceFor } from "./summary.js";
+
 const VALID_DEPTHS = new Set(["brief", "standard", "deep"]);
+const VALID_PACES = new Set(["silent", "brief", "full"]);
 
 export function validateNarration(narration, annotation) {
   const errors = [];
@@ -22,8 +25,8 @@ export function validateNarration(narration, annotation) {
     return { valid: false, errors: ["narration must be an object"] };
   }
 
-  if (narration.schemaVersion !== "1.2.0") {
-    errors.push(`schemaVersion must be "1.2.0" (got ${JSON.stringify(narration.schemaVersion)})`);
+  if (narration.schemaVersion !== "1.3.0") {
+    errors.push(`schemaVersion must be "1.3.0" (got ${JSON.stringify(narration.schemaVersion)})`);
   }
   requireString(narration, "title", 4, 80, errors);
   if (narration.subtitle != null && typeof narration.subtitle !== "string") {
@@ -70,9 +73,14 @@ function validateSegment(seg, i, errors) {
   if (!Number.isInteger(seg.plyIndex) || seg.plyIndex < -1) {
     errors.push(`${path}.plyIndex must be an integer ≥ -1`);
   }
-  requireString(seg, "text", 1, Infinity, errors, path);
-  if (typeof seg.estimatedSeconds !== "number" || seg.estimatedSeconds < 1.5 || seg.estimatedSeconds > 45) {
-    errors.push(`${path}.estimatedSeconds must be a number in [1.5, 45]`);
+  // text may be empty for silent-pace moves; the per-ply cross-check enforces
+  // non-empty text where the engine-derived pace is brief/full.
+  requireString(seg, "text", 0, Infinity, errors, path);
+  if (typeof seg.estimatedSeconds !== "number" || seg.estimatedSeconds < 0 || seg.estimatedSeconds > 45) {
+    errors.push(`${path}.estimatedSeconds must be a number in [0, 45]`);
+  }
+  if (seg.pace != null && !VALID_PACES.has(seg.pace)) {
+    errors.push(`${path}.pace must be one of: silent, brief, full`);
   }
   if (seg.depth != null && !VALID_DEPTHS.has(seg.depth)) {
     errors.push(`${path}.depth must be one of: brief, standard, deep`);
@@ -164,11 +172,29 @@ function crossCheck(narration, annotation, errors) {
     );
     return;
   }
+  const kmByPly = new Map(
+    (annotation.keyMoments ?? []).map((km) => [km.plyIndex, km])
+  );
+  const challengePly = annotation.challenge?.plyIndex ?? null;
   for (let i = 0; i < plies.length; i++) {
-    if (narration.segments[i].plyIndex !== plies[i].plyIndex) {
+    const seg = narration.segments[i];
+    if (seg.plyIndex !== plies[i].plyIndex) {
       errors.push(
-        `segments[${i}].plyIndex=${narration.segments[i].plyIndex} does not match plies[${i}].plyIndex=${plies[i].plyIndex}`
+        `segments[${i}].plyIndex=${seg.plyIndex} does not match plies[${i}].plyIndex=${plies[i].plyIndex}`
       );
+      continue;
+    }
+    // A brief/full move must carry spoken text; the challenge ply is exempt —
+    // its visible narration comes from the challenge block, so the segment
+    // text there is vestigial.
+    if (plies[i].plyIndex !== challengePly) {
+      const pace = paceFor(plies[i], kmByPly.get(plies[i].plyIndex));
+      const hasText = typeof seg.text === "string" && seg.text.trim().length > 0;
+      if ((pace === "brief" || pace === "full") && !hasText) {
+        errors.push(
+          `segments[${i}] (ply ${plies[i].plyIndex}, pace=${pace}) must have non-empty text`
+        );
+      }
     }
   }
 

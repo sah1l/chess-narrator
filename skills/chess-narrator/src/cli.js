@@ -13,6 +13,7 @@ import {
   renderPreviewHtml,
   writeManifest,
   getRenderer,
+  DEFAULT_RENDERER,
 } from "./render/index.js";
 import { runVerify } from "./verify.js";
 import {
@@ -100,10 +101,16 @@ Options (list-voices):
 
 Options (render):
   --out-dir <path>        Where to write render outputs (default: samples/output/render)
-  --renderer <name>       Compile to MP4 with renderer: 'ffmpeg' or 'hyperframes'
-                          (omit to only produce preview.html + manifest)
-  --mp4 <path>            MP4 output path when --renderer is set
-                          (default: samples/output/video.mp4)
+  --renderer <name>       MP4 renderer: 'hyperframes' (default) or 'ffmpeg'.
+                            hyperframes — continuous animated board + live eval bar
+                                          (deterministic; fetches the HyperFrames CLI
+                                          via npx on first use — needs internet once).
+                            ffmpeg      — still slideshow fallback (Chrome + ffmpeg on PATH).
+  --mp4 <path>            MP4 output path (default: samples/output/video.mp4).
+                          Passing --mp4 or --renderer triggers the MP4 compile;
+                          omit both to only produce preview.html + manifest.
+  --board-theme <name>    Board colors for the hyperframes renderer:
+                            'green' (default, chess.com), 'brown' (lichess), 'blue'.
 
 Options (verify):
   --skip-network          Skip the optional network reachability check for edge-tts
@@ -370,6 +377,7 @@ async function cmdRender(args) {
       "out-dir": { type: "string" },
       renderer: { type: "string" },
       mp4: { type: "string" },
+      "board-theme": { type: "string" },
       help: { type: "boolean" },
     },
   });
@@ -394,16 +402,22 @@ async function cmdRender(args) {
   log(`  preview:  ${previewPath}`);
   log(`Open the preview in your browser to watch the explainer end-to-end.`);
 
-  if (values.renderer) {
-    log(`\nCompiling MP4 with renderer=${values.renderer}...`);
-    const renderer = getRenderer(values.renderer);
+  // Compile an MP4 when the user asks for a renderer or an output path. The
+  // default renderer is the continuous (hyperframes) one; pass
+  // --renderer ffmpeg for the still fallback.
+  if (values.renderer || values.mp4) {
+    const rendererName = values.renderer ?? DEFAULT_RENDERER;
+    log(`\nCompiling MP4 with renderer=${rendererName}...`);
+    const renderer = getRenderer(rendererName);
     const workDir = path.join(outDir, ".render-work");
     const t0 = Date.now();
     const result = await renderer.render({
+      script,
       manifest,
       manifestDir: outDir,
       outDir: workDir,
       outPath: mp4Path,
+      theme: values["board-theme"],
       onProgress: (msg) => process.stderr.write(`\r[render] ${msg}                    `),
     });
     process.stderr.write("\n");

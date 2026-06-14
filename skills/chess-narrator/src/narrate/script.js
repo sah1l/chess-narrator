@@ -1,5 +1,11 @@
 import { Chess } from "chess.js";
 import { uciToSan } from "../utils.js";
+import { paceFor } from "./summary.js";
+
+// Hold time (seconds) for a silent move in the legacy still renderer — just
+// long enough to register the slide. The continuous renderer computes its own
+// animation timing and treats this as a floor.
+const SILENT_HOLD_SEC = 1.2;
 
 /**
  * Combine annotation + narration into a final "shot list" — the ordered
@@ -131,6 +137,12 @@ function pickShotKindFor(ply, km) {
  */
 function buildPlyShot(ply, km, seg, idx) {
   const kind = pickShotKindFor(ply, km);
+  // Engine-derived pace governs the continuous renderer: silent moves get no
+  // voice and a quick slide; brief/full moves keep their narration. The pace
+  // is recomputed here from the annotation, not trusted from the narration —
+  // so a typical game lands in the 5–7 minute range deterministically.
+  const pace = paceFor(ply, km);
+  const silent = pace === "silent";
 
   const playedArrow = ply.uci ? uciToArrow(ply.uci, "played") : null;
 
@@ -170,6 +182,7 @@ function buildPlyShot(ply, km, seg, idx) {
     id: `${kind}-${baseId}`,
     kind,
     plyIndex: ply.plyIndex,
+    pace,
     depth: seg.depth ?? (kind === "moment" ? "deep" : "standard"),
     momentKind: km?.kind ?? null,
     classification: ply.classification ?? null,
@@ -177,6 +190,7 @@ function buildPlyShot(ply, km, seg, idx) {
     fenBefore: ply.fenBefore,
     fenAfter: ply.fenAfter ?? null,
     eval: evalFromEvaluation(ply.evalBefore),
+    evalAfter: evalFromEvaluation(ply.evalAfter),
     playedMove: { san: ply.san, uci: ply.uci },
     engineBest,
     moveLabel,
@@ -184,8 +198,11 @@ function buildPlyShot(ply, km, seg, idx) {
     arrows,
     highlights,
     engineLine,
-    durationSec: seg.estimatedSeconds,
-    narration: seg.text,
+    // Silent moves carry no voice — the renderer slides the piece and moves on.
+    // We still hold SILENT_HOLD_SEC so the slide is legible in the still
+    // renderer; the continuous renderer recomputes its own timing.
+    durationSec: silent ? SILENT_HOLD_SEC : seg.estimatedSeconds,
+    narration: silent ? null : seg.text,
   };
 }
 
@@ -264,6 +281,7 @@ function buildChallengeShots(ply, challenge) {
     fenBefore: ply.fenBefore,
     fenAfter: ply.fenAfter ?? null,
     eval: challengeEval,
+    evalAfter: evalFromEvaluation(ply.evalAfter),
     sideToMove: ply.sideToMove,
     answer: { san: ply.san, uci: ply.uci },
     moveLabel: `${moveLabel}${ply.san}`,
