@@ -1,9 +1,10 @@
-import { mkdir, writeFile, access } from "node:fs/promises";
+import { mkdir, writeFile, access, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { pathToFileURL } from "node:url";
 import { constants as FS } from "node:fs";
+import { trackChild, slugifyId } from "../utils.js";
 
 /**
  * ffmpeg renderer — produces an MP4 by:
@@ -40,51 +41,63 @@ export async function render({ manifest, manifestDir, outDir, outPath, onProgres
   await mkdir(segmentsDir, { recursive: true });
 
   const { width, height } = manifest.frame;
+  let ok = false;
+  try {
+    // 1. Screenshot each shot HTML
+    const frames = [];
+    for (let i = 0; i < manifest.shots.length; i++) {
+      const shot = manifest.shots[i];
+      onProgress?.(`screenshot ${i + 1}/${manifest.shots.length}: ${shot.id}`);
+      const htmlAbs = path.resolve(manifestDir, shot.htmlPath);
+      const framePath = path.join(framesDir, `${slugifyId(shot.id)}.png`);
+      await screenshot(chrome, htmlAbs, framePath, width, height);
+      frames.push({ shot, framePath });
+    }
 
-  // 1. Screenshot each shot HTML
-  const frames = [];
-  for (let i = 0; i < manifest.shots.length; i++) {
-    const shot = manifest.shots[i];
-    onProgress?.(`screenshot ${i + 1}/${manifest.shots.length}: ${shot.id}`);
-    const htmlAbs = path.resolve(manifestDir, shot.htmlPath);
-    const framePath = path.join(framesDir, `${shot.id}.png`);
-    await screenshot(chrome, htmlAbs, framePath, width, height);
-    frames.push({ shot, framePath });
+    // 2. Make one segment per shot
+    const segmentPaths = [];
+    for (let i = 0; i < frames.length; i++) {
+      const { shot, framePath } = frames[i];
+      onProgress?.(`encode ${i + 1}/${frames.length}: ${shot.id}`);
+      const audioPath = shot.audioPath ? path.resolve(manifestDir, shot.audioPath) : null;
+      const segPath = path.join(segmentsDir, `${String(i).padStart(3, "0")}-${slugifyId(shot.id)}.mp4`);
+      await encodeSegment(ffmpeg, {
+        imagePath: framePath,
+        audioPath,
+        durationSec: shot.durationSec,
+        outPath: segPath,
+      });
+      segmentPaths.push(segPath);
+    }
+
+    // 3. Concat
+    onProgress?.("concat");
+    const concatList = segmentPaths
+      .map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
+      .join("\n");
+    const concatListPath = path.join(outDir, "concat.txt");
+    await writeFile(concatListPath, concatList);
+    await runCmd(ffmpeg, [
+      "-y",
+      "-f", "concat",
+      "-safe", "0",
+      "-i", concatListPath,
+      "-c", "copy",
+      outPath,
+    ]);
+
+    ok = true;
+    return { outPath };
+  } finally {
+    // On success OR failure: nuke the temp work dirs so we don't leak partial
+    // PNGs / segment MP4s. On success we drop them because they're huge and
+    // useless; on failure we drop them so the next run starts clean.
+    // (Keep concat.txt because it's tiny and useful for debugging.)
+    if (ok || process.env.KEEP_RENDER_TEMP !== "1") {
+      await rm(framesDir, { recursive: true, force: true }).catch(() => {});
+      await rm(segmentsDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
-
-  // 2. Make one segment per shot
-  const segmentPaths = [];
-  for (let i = 0; i < frames.length; i++) {
-    const { shot, framePath } = frames[i];
-    onProgress?.(`encode ${i + 1}/${frames.length}: ${shot.id}`);
-    const audioPath = shot.audioPath ? path.resolve(manifestDir, shot.audioPath) : null;
-    const segPath = path.join(segmentsDir, `${String(i).padStart(3, "0")}-${shot.id}.mp4`);
-    await encodeSegment(ffmpeg, {
-      imagePath: framePath,
-      audioPath,
-      durationSec: shot.durationSec,
-      outPath: segPath,
-    });
-    segmentPaths.push(segPath);
-  }
-
-  // 3. Concat
-  onProgress?.("concat");
-  const concatList = segmentPaths
-    .map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
-    .join("\n");
-  const concatListPath = path.join(outDir, "concat.txt");
-  await writeFile(concatListPath, concatList);
-  await runCmd(ffmpeg, [
-    "-y",
-    "-f", "concat",
-    "-safe", "0",
-    "-i", concatListPath,
-    "-c", "copy",
-    outPath,
-  ]);
-
-  return { outPath };
 }
 
 async function screenshot(chromeBin, htmlAbsPath, outPng, width, height) {
@@ -122,7 +135,7 @@ async function encodeSegment(ffmpegBin, { imagePath, audioPath, durationSec, out
 
 function runCmd(cmd, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = trackChild(spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] }));
     let stderr = "";
     child.stderr.on("data", (d) => (stderr += d.toString()));
     child.on("error", reject);

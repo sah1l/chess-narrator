@@ -1,5 +1,6 @@
 import path from "node:path";
 import { renderShotBody, SHARED_CSS, FRAME_WIDTH, FRAME_HEIGHT } from "./templates.js";
+import { toForwardSlash } from "../utils.js";
 
 /**
  * Build a single-file HTML preview that plays the whole sequence in any
@@ -28,7 +29,7 @@ export function renderPreviewHtml(script, { previewDir }) {
       const body = renderShotBody(shot, ctx);
       const audioPath = shot.audioPath ? toForwardSlash(path.relative(previewDir, shot.audioPath)) : null;
       const audio = audioPath
-        ? `<audio data-shot-index="${i}" preload="auto" src="${audioPath}"></audio>`
+        ? `<audio data-shot-index="${i}" preload="none" src="${audioPath}"></audio>`
         : "";
       return `<div class="slide" data-shot-index="${i}" data-duration-ms="${Math.round(shot.durationSec * 1000)}">${body}${audio}</div>`;
     })
@@ -98,7 +99,7 @@ export function renderPreviewHtml(script, { previewDir }) {
   }
 
   function pauseAll() {
-    audios.forEach((a) => { a.pause(); a.currentTime = 0; });
+    audios.forEach((a) => { a.pause(); a.currentTime = 0; a.onended = null; });
     if (timer) { clearTimeout(timer); timer = null; }
     playing = false;
     document.getElementById('btn-play').textContent = '▶ Play';
@@ -108,17 +109,35 @@ export function renderPreviewHtml(script, { previewDir }) {
     current = i;
     show(i);
     shotStartedAt = performance.now();
-    const dur = SHOTS[i].durationSec * 1000;
+    const durMs = SHOTS[i].durationSec * 1000;
     const audio = audioByIndex.get(i);
+
+    // Clear any previous listener on this audio element.
     if (audio) {
+      audio.onended = null;
       audio.currentTime = 0;
-      audio.play().catch(() => {});
+      audio.play().catch((e) => console.warn('preview audio play failed:', e.message));
     }
-    timer = setTimeout(() => {
+
+    // Shared advance logic. Both audio.onended and the timeout fallback call
+    // this; each one neutralises the other before advancing so we never
+    // double-fire on the same shot.
+    const advance = () => {
       if (!playing) return;
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (audio) audio.onended = null;
       if (current + 1 < totalShots) playShot(current + 1);
       else pauseAll();
-    }, dur);
+    };
+
+    if (audio) audio.onended = advance;
+
+    // Timeout fallback (also the sole timer for shots without audio).
+    timer = setTimeout(() => {
+      if (!playing) return;
+      if (audio) audio.onended = null;
+      advance();
+    }, durMs);
   }
 
   function togglePlay() {
@@ -209,10 +228,6 @@ const PREVIEW_CSS = `
   }
   .slide audio { display: none; }
 `;
-
-function toForwardSlash(p) {
-  return p.split(path.sep).join("/");
-}
 
 function escapeAttr(s) {
   if (s == null) return "";

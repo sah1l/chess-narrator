@@ -13,7 +13,9 @@ export { renderPreviewHtml } from "./preview.js";
 export { writeManifest } from "./manifest.js";
 
 const RENDERERS = { ffmpeg, hyperframes };
-export const DEFAULT_RENDERER = "ffmpeg";
+// Continuous animated video is the default; ffmpeg stays as the offline/still
+// fallback (no HyperFrames CLI / no network).
+export const DEFAULT_RENDERER = "hyperframes";
 
 export function getRenderer(name = DEFAULT_RENDERER) {
   const r = RENDERERS[name];

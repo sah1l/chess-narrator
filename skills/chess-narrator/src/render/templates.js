@@ -1,5 +1,6 @@
 import { renderBoardSvg } from "./board.js";
 import { renderEvalBar, EVAL_BAR_CSS } from "./evalbar.js";
+import { escapeHtml as _escape } from "../utils.js";
 
 /**
  * Shot HTML templates. Each shot renders as a 1920x1080 frame designed to
@@ -285,12 +286,7 @@ function momentTagText(kind) {
 
 function escapeHtml(s) {
   if (s == null) return "";
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return _escape(s);
 }
 
 export const SHARED_CSS = `

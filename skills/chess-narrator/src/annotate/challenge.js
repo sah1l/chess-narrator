@@ -1,4 +1,4 @@
-import { Chess } from "chess.js";
+import { uciToSan, uciPvToSan } from "../utils.js";
 
 /**
  * Pick ONE "pause and think" challenge moment per game, or return null if
@@ -75,6 +75,9 @@ function clearGap(pvLines, sideToMove) {
   const bIsWinMate = b.mate != null && (b.mate > 0) === (sign > 0);
   if (aIsWinMate && !bIsWinMate) return 9999; // mate vs anything else
   if (aIsWinMate && bIsWinMate) {
+    // Both lines mate. Require a margin of ≥2 plies — a mate-in-1
+    // beating mate-in-3 is clearly worth pausing on; mate-in-1 beating
+    // mate-in-2 may just be a tempo difference, not a teaching moment.
     const fasterBy = Math.abs(b.mate) - Math.abs(a.mate);
     return fasterBy >= 2 ? 9999 : null;
   }
@@ -85,20 +88,7 @@ function clearGap(pvLines, sideToMove) {
 
 function pvToCandidate(pv, fenBefore, isBest) {
   const firstUci = pv.moves?.[0] ?? null;
-  let firstSan = firstUci;
-  if (firstUci) {
-    try {
-      const b = new Chess(fenBefore);
-      const m = b.move({
-        from: firstUci.slice(0, 2),
-        to: firstUci.slice(2, 4),
-        promotion: firstUci.length > 4 ? firstUci[4] : undefined,
-      });
-      if (m) firstSan = m.san;
-    } catch {
-      // keep uci fallback
-    }
-  }
+  const firstSan = uciToSan(fenBefore, firstUci) ?? firstUci;
   return {
     rank: pv.rank ?? null,
     san: firstSan,
@@ -110,23 +100,3 @@ function pvToCandidate(pv, fenBefore, isBest) {
   };
 }
 
-function uciPvToSan(fen, uciPv, maxPlies) {
-  const out = [];
-  if (!fen || !Array.isArray(uciPv)) return out;
-  const board = new Chess(fen);
-  for (let i = 0; i < Math.min(uciPv.length, maxPlies); i++) {
-    const u = uciPv[i];
-    try {
-      const m = board.move({
-        from: u.slice(0, 2),
-        to: u.slice(2, 4),
-        promotion: u.length > 4 ? u[4] : undefined,
-      });
-      if (!m) break;
-      out.push(m.san);
-    } catch {
-      break;
-    }
-  }
-  return out;
-}

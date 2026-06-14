@@ -7,7 +7,7 @@
   "required": ["schemaVersion", "title", "intro", "segments", "outro"],
   "additionalProperties": false,
   "properties": {
-    "schemaVersion": { "const": "1.2.0" },
+    "schemaVersion": { "const": "1.3.0" },
     "title": {
       "type": "string",
       "description": "Short title for the video, used on the title card and as the file name.",
@@ -44,14 +44,19 @@
           },
           "text": {
             "type": "string",
-            "minLength": 1,
-            "description": "Narration to be read aloud over this segment. Should align with estimatedSeconds at a natural reading pace (~150 wpm)."
+            "minLength": 0,
+            "description": "Narration to be read aloud over this segment. Should align with estimatedSeconds at a natural reading pace (~150 wpm). MUST be empty (\"\") when pace is 'silent' — the piece just slides with no voice. For 'brief' moves keep it to one short clause; full commentary only on 'full' moves."
           },
           "estimatedSeconds": {
             "type": "number",
-            "minimum": 1.5,
+            "minimum": 0,
             "maximum": 45,
-            "description": "Approximate spoken duration. Book/routine moves: 3-6s. Interesting moves: 6-10s. Critical moments: 10-18s."
+            "description": "Approximate spoken duration. silent: 0 (no voice). brief: 1.5-3s, one short line. full: 8-18s. The authoritative pace is recomputed from the engine analysis at build time, so this is an estimate only."
+          },
+          "pace": {
+            "type": "string",
+            "enum": ["silent", "brief", "full"],
+            "description": "Engine-derived pacing tier. 'silent' = no spoken narration, quick slide (book/theory). 'brief' = one short line, quick slide (routine moves, recaptures, queen-to-safety). 'full' = pause + arrows + full coach commentary (inaccuracies, mistakes, blunders, brilliancies, turning points). Advisory in narration — build-script recomputes the authoritative value from the annotation."
           },
           "depth": {
             "type": "string",

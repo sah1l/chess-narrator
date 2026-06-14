@@ -1,3 +1,5 @@
+import { escapeHtml } from "../utils.js";
+
 /**
  * Vertical evaluation bar (Lichess-style) — shows whose position is stronger.
  *
@@ -55,13 +57,6 @@ function formatLabel({ cp, mate }) {
   if (cp > 0) return `+${v}`;
   if (cp < 0) return `−${v}`;
   return v;
-}
-
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 /** CSS rules consumed by the bar; imported by templates.js into SHARED_CSS. */

@@ -1,4 +1,4 @@
-import { Chess } from "chess.js";
+import { uciToSan, uciPvToSan } from "../utils.js";
 
 /**
  * Boil a full annotation down to a compact briefing object that's small enough
@@ -121,7 +121,7 @@ function briefingForPosition(annotation) {
  *   - best/good with engine alternative gap and not matching engine → interesting
  *   - otherwise → routine
  */
-function tierFor(ply, km) {
+export function tierFor(ply, km) {
   if (km) return "critical"; // selected as a key moment by the analyzer
   if (ply.isBookMove) return "book";
   const c = ply.classification;
@@ -133,8 +133,42 @@ function tierFor(ply, km) {
   return "routine";
 }
 
+/**
+ * Pacing tier — how much of the video's TIME this move earns. Distinct from
+ * the commentary tier above: it drives whether the move gets spoken narration
+ * at all, and how long the board holds on it. This is the engine-derived
+ * default the renderer and prompt both key off so a typical game lands in the
+ * 5–7 minute range instead of one full segment per ply.
+ *
+ *   silent — no spoken narration; the piece just slides (book / pure theory).
+ *            The board shows the move; the viewer hears nothing.
+ *   brief  — one short line; quick slide (routine moves, "queen to safety",
+ *            recaptures, moves where the engine had a minor preference).
+ *   full   — pause, arrows/highlights, full coach commentary (inaccuracies,
+ *            mistakes, blunders, brilliancies, turning points, key moments).
+ */
+export function tierToPace(tier) {
+  switch (tier) {
+    case "book":
+      return "silent";
+    case "routine":
+    case "interesting":
+      return "brief";
+    case "critical":
+      return "full";
+    default:
+      return "brief";
+  }
+}
+
+/** Engine-derived pace for one ply (see tierToPace). */
+export function paceFor(ply, km) {
+  return tierToPace(tierFor(ply, km));
+}
+
 function briefingForMove(ply, km, annotation) {
   const tier = tierFor(ply, km);
+  const pace = tierToPace(tier);
   const mover = ply.sideToMove === "w" ? "White" : "Black";
   const moveStr = `${ply.moveNumber}${ply.sideToMove === "w" ? "." : "..."}${ply.san}`;
 
@@ -165,6 +199,7 @@ function briefingForMove(ply, km, annotation) {
     san: ply.san,
     uci: ply.uci,
     tier,
+    pace,
     classification: ply.classification,
     isBookMove: ply.isBookMove,
     isCheck: ply.san.includes("+"),
@@ -230,7 +265,7 @@ function describeEval(ev) {
   if (ev.cp != null) {
     const v = (ev.cp / 100).toFixed(2);
     if (ev.cp >= 50) return `White +${v}`;
-    if (ev.cp <= -50) return `Black +${Math.abs(v).toFixed ? Math.abs(v).toFixed(2) : Math.abs(v)}`;
+    if (ev.cp <= -50) return `Black +${Math.abs(v).toFixed(2)}`;
     return `roughly equal (${v})`;
   }
   return "n/a";
@@ -248,40 +283,4 @@ function swingFromPly(ply) {
   if (before == null || after == null) return null;
   const sign = ply.sideToMove === "b" ? -1 : 1;
   return (after - before) * sign;
-}
-
-function uciPvToSan(fen, uciPv, maxPlies = 6) {
-  if (!fen || !Array.isArray(uciPv)) return [];
-  const board = new Chess(fen);
-  const out = [];
-  for (let i = 0; i < Math.min(uciPv.length, maxPlies); i++) {
-    const u = uciPv[i];
-    try {
-      const m = board.move({
-        from: u.slice(0, 2),
-        to: u.slice(2, 4),
-        promotion: u.length > 4 ? u[4] : undefined,
-      });
-      if (!m) break;
-      out.push(m.san);
-    } catch {
-      break;
-    }
-  }
-  return out;
-}
-
-function uciToSan(fen, uci) {
-  if (!fen || !uci) return null;
-  try {
-    const board = new Chess(fen);
-    const m = board.move({
-      from: uci.slice(0, 2),
-      to: uci.slice(2, 4),
-      promotion: uci.length > 4 ? uci[4] : undefined,
-    });
-    return m?.san ?? null;
-  } catch {
-    return null;
-  }
 }

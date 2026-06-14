@@ -1,5 +1,5 @@
-import { Chess } from "chess.js";
 import { CLASSIFICATION, evalToCp } from "./classify.js";
+import { pvScalar, uciToSan } from "../utils.js";
 
 const SEVERITY = {
   [CLASSIFICATION.BLUNDER]: 4,
@@ -105,10 +105,14 @@ function findPositiveMoments(plies, alreadyPicked, { maxPositives = 3 } = {}) {
     const pvs = p.evalBefore.pvLines ?? [];
     if (pvs.length < 2) continue;
     const sign = p.sideToMove === "b" ? -1 : 1;
-    const v1 = pvToCp(pvs[0]);
-    const v2 = pvToCp(pvs[1]);
+    const v1 = pvScalar(pvs[0]);
+    const v2 = pvScalar(pvs[1]);
     if (v1 == null || v2 == null) continue;
     const gap = (v1 - v2) * sign;
+    // Threshold of 150 cp is intentionally higher than the 50-cp candidate
+    // gate in analyze.js::collectCandidates: that lower bar casts a wide net
+    // for *potential* key-moment plies; this higher bar keeps the final
+    // positive-moment picks genuinely impressive (only the biggest PV gaps).
     if (gap < 150) continue;
     candidates.push({ ply: p, gap, pv1IsMate: pvs[0].mate != null });
   }
@@ -177,12 +181,6 @@ function findPositiveMoments(plies, alreadyPicked, { maxPositives = 3 } = {}) {
   return out;
 }
 
-function pvToCp(pv) {
-  if (pv.cp != null) return pv.cp;
-  if (pv.mate != null) return pv.mate > 0 ? 10000 - pv.mate * 10 : -10000 - pv.mate * 10;
-  return null;
-}
-
 function buildKeyMoment(p, kind) {
   const engineBest = engineBestFromEval(p.evalBefore, p.fenBefore);
   const swing = computeSwing(p);
@@ -200,28 +198,20 @@ function buildKeyMoment(p, kind) {
 function engineBestFromEval(ev, fenBefore) {
   if (!ev || !ev.bestMove) return null;
   const uci = ev.bestMove;
-  let san = uci;
-  try {
-    const board = new Chess(fenBefore);
-    const m = board.move({
-      from: uci.slice(0, 2),
-      to: uci.slice(2, 4),
-      promotion: uci.length > 4 ? uci[4] : undefined,
-    });
-    if (m) san = m.san;
-  } catch {
-    // fall back to uci
-  }
+  const san = uciToSan(fenBefore, uci) ?? uci;
   const pv = ev.pvLines?.[0]?.moves ?? [uci];
   return { uci, san, pv };
 }
 
 function computeSwing(p) {
+  // Use mate-aware scalar so mate transitions (cp=null, mate=±N) produce a
+  // real swing instead of being dropped as "n/a" — those are usually the
+  // most dramatic moments in the game.
   const sign = p.sideToMove === "b" ? -1 : 1;
-  const before = p.evalBefore.cp != null ? p.evalBefore.cp * sign : null;
-  const after = p.evalAfter.cp != null ? p.evalAfter.cp * sign : null;
-  if (before == null || after == null) return null;
-  return after - before; // mover's POV
+  const beforeRaw = pvScalar(p.evalBefore);
+  const afterRaw = p.evalAfter ? pvScalar(p.evalAfter) : null;
+  if (beforeRaw == null || afterRaw == null) return null;
+  return (afterRaw - beforeRaw) * sign; // mover's POV
 }
 
 function buildHeadline(p, kind, engineBest, swing) {

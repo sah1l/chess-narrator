@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { validateNarration } from "../src/narrate/validate.js";
 import { buildShotList } from "../src/narrate/script.js";
 import { buildNarrationPrompt } from "../src/narrate/prompt.js";
-import { buildBriefing } from "../src/narrate/summary.js";
+import { buildBriefing, tierToPace, paceFor } from "../src/narrate/summary.js";
 import { pickChallenge } from "../src/annotate/challenge.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,30 +34,65 @@ test("validateNarration rejects missing schemaVersion", () => {
   assert.ok(errors.some((e) => /schemaVersion/.test(e)));
 });
 
-test("validateNarration rejects mismatched challenge.plyIndex", async () => {
-  const annotation = await loadJson("samples/output/annotation.json");
-  const narration = await loadJson("samples/sample-narration.json");
-  const broken = {
-    ...narration,
-    challenge: { ...narration.challenge, plyIndex: narration.challenge.plyIndex + 2 },
+test("validateNarration rejects mismatched challenge.plyIndex", () => {
+  const annotation = {
+    plies: [
+      { plyIndex: 0 },
+      { plyIndex: 1 },
+    ],
+    challenge: { plyIndex: 0 },
   };
-  const { valid, errors } = validateNarration(broken, annotation);
+  const narration = {
+    schemaVersion: "1.3.0",
+    title: "Test Game",
+    intro: { text: "Welcome to this game", estimatedSeconds: 5 },
+    segments: [
+      { plyIndex: 0, text: "First move", estimatedSeconds: 5 },
+      { plyIndex: 1, text: "Second move", estimatedSeconds: 5 },
+    ],
+    outro: { text: "Thanks for watching", estimatedSeconds: 5 },
+    challenge: {
+      plyIndex: 2,
+      prompt: { text: "What would you play here?", estimatedSeconds: 8 },
+      thinkSeconds: 5,
+      candidates: [
+        { san: "e4", uci: "e2e4", text: "e4 is best", estimatedSeconds: 6 },
+      ],
+      reveal: { text: "e4 was correct!", estimatedSeconds: 8 },
+    },
+  };
+  const { valid, errors } = validateNarration(narration, annotation);
   assert.equal(valid, false);
   assert.ok(errors.some((e) => /challenge\.plyIndex mismatch/.test(e)));
 });
 
-test("validateNarration requires challenge when annotation has one", async () => {
-  const annotation = await loadJson("samples/output/annotation.json");
-  const narration = await loadJson("samples/sample-narration.json");
-  const stripped = { ...narration, challenge: null };
-  const { valid, errors } = validateNarration(stripped, annotation);
+test("validateNarration requires challenge when annotation has one", () => {
+  const annotation = {
+    plies: [
+      { plyIndex: 0 },
+      { plyIndex: 1 },
+    ],
+    challenge: { plyIndex: 0 },
+  };
+  const narration = {
+    schemaVersion: "1.3.0",
+    title: "Test Game",
+    intro: { text: "Welcome to this game", estimatedSeconds: 5 },
+    segments: [
+      { plyIndex: 0, text: "First move", estimatedSeconds: 5 },
+      { plyIndex: 1, text: "Second move", estimatedSeconds: 5 },
+    ],
+    outro: { text: "Thanks for watching", estimatedSeconds: 5 },
+    // deliberately omit challenge
+  };
+  const { valid, errors } = validateNarration(narration, annotation);
   assert.equal(valid, false);
   assert.ok(errors.some((e) => /narration\.challenge is null/.test(e)));
 });
 
 test("validateNarration rejects segment with out-of-range estimatedSeconds", () => {
   const narration = {
-    schemaVersion: "1.2.0",
+    schemaVersion: "1.3.0",
     title: "Test game",
     intro: { text: "hi", estimatedSeconds: 5 },
     segments: [{ plyIndex: 0, text: "x", estimatedSeconds: 90 }],
@@ -70,7 +105,7 @@ test("validateNarration rejects segment with out-of-range estimatedSeconds", () 
 
 test("validateNarration rejects invalid highlightSquares", () => {
   const narration = {
-    schemaVersion: "1.2.0",
+    schemaVersion: "1.3.0",
     title: "Test game",
     intro: { text: "hi", estimatedSeconds: 5 },
     segments: [
@@ -85,7 +120,7 @@ test("validateNarration rejects invalid highlightSquares", () => {
 
 test("validateNarration rejects unknown depth value", () => {
   const narration = {
-    schemaVersion: "1.2.0",
+    schemaVersion: "1.3.0",
     title: "Test game",
     intro: { text: "hi", estimatedSeconds: 5 },
     segments: [
@@ -133,9 +168,46 @@ test("buildShotList produces title + intro + per-ply shots + challenge expansion
   assert.equal(script.shots[script.shots.length - 1].kind, "outro");
 });
 
-test("buildShotList replaces challenge ply with prompt/think/candidates/reveal sequence", async () => {
-  const annotation = await loadJson("samples/output/annotation.json");
-  const narration = await loadJson("samples/sample-narration.json");
+test("buildShotList replaces challenge ply with prompt/think/candidates/reveal sequence", () => {
+  const plies = [
+    {
+      plyIndex: 0, moveNumber: 1, sideToMove: "w", san: "e4", uci: "e2e4",
+      fenBefore: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      fenAfter: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+      evalBefore: { cp: 30 }, evalAfter: { cp: 28 },
+    },
+    {
+      plyIndex: 1, moveNumber: 1, sideToMove: "b", san: "e5", uci: "e7e5",
+      fenBefore: "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+      fenAfter: "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+      evalBefore: { cp: 28 }, evalAfter: { cp: 25 },
+    },
+  ];
+  const annotation = {
+    plies,
+    keyMoments: [],
+    challenge: { plyIndex: 0 },
+  };
+  const narration = {
+    schemaVersion: "1.3.0",
+    title: "Test Game",
+    intro: { text: "Welcome to this game", estimatedSeconds: 5 },
+    segments: [
+      { plyIndex: 0, text: "e4 is played", estimatedSeconds: 5 },
+      { plyIndex: 1, text: "e5 in response", estimatedSeconds: 5 },
+    ],
+    outro: { text: "Thanks for watching", estimatedSeconds: 5 },
+    challenge: {
+      plyIndex: 0,
+      prompt: { text: "What would you play here?", estimatedSeconds: 8 },
+      thinkSeconds: 5,
+      candidates: [
+        { san: "d4", uci: "d2d4", text: "d4 is an option", estimatedSeconds: 6 },
+        { san: "Nf3", uci: "g1f3", text: "Nf3 develops", estimatedSeconds: 6 },
+      ],
+      reveal: { text: "e4 was correct!", estimatedSeconds: 8 },
+    },
+  };
   const script = buildShotList(annotation, narration);
   const cPly = narration.challenge.plyIndex;
 
@@ -158,7 +230,7 @@ test("buildShotList replaces challenge ply with prompt/think/candidates/reveal s
   assert.equal(think.narration, null);
   // reveal carries the answer move + a green "answer" arrow
   const reveal = cplyShots[cplyShots.length - 1];
-  assert.equal(reveal.answer.san, annotation.plies[cPly].san);
+  assert.equal(reveal.answer.san, plies[cPly].san);
   assert.equal(reveal.arrows[0].role, "answer");
   // candidates each carry a "wrong" arrow
   for (let i = 2; i < kinds.length - 1; i++) {
@@ -271,8 +343,103 @@ test("buildNarrationPrompt renders briefing with every move and tier annotations
   assert.ok(user.includes("[ply 0]"));
   assert.ok(user.includes("[ply 11]"));
   assert.ok(user.includes("[ply 32]"));
-  // tier tags are visible
+  // tier + pace tags are visible
   assert.ok(user.includes("tier=book"));
   assert.ok(user.includes("tier=critical"));
+  assert.ok(user.includes("pace=silent"));
+  assert.ok(user.includes("pace=full"));
   assert.equal(briefing.moves.length, annotation.plies.length);
+});
+
+// --- Pacing model (silent / brief / full) ----------------------------------
+
+test("tierToPace maps commentary tiers to pacing tiers", () => {
+  assert.equal(tierToPace("book"), "silent");
+  assert.equal(tierToPace("routine"), "brief");
+  assert.equal(tierToPace("interesting"), "brief");
+  assert.equal(tierToPace("critical"), "full");
+});
+
+test("paceFor: book→silent, key moment→full", () => {
+  assert.equal(paceFor({ isBookMove: true, classification: "book" }, null), "silent");
+  assert.equal(paceFor({ classification: "mistake" }, null), "full");
+  assert.equal(paceFor({ classification: "best" }, { kind: "brilliant" }), "full");
+});
+
+test("buildBriefing tags each move with an engine-derived pace", async () => {
+  const annotation = await loadJson("samples/output/annotation.json");
+  const briefing = buildBriefing(annotation);
+  const book = briefing.moves.find((m) => m.plyIndex === 0);
+  assert.equal(book.pace, "silent");
+  const mistake = briefing.moves.find((m) => m.plyIndex === 11);
+  assert.equal(mistake.pace, "full");
+});
+
+test("buildShotList: silent moves carry no narration; shots carry pace + evalAfter", async () => {
+  const annotation = await loadJson("samples/output/annotation.json");
+  const narration = await loadJson("samples/sample-narration.json");
+  const script = buildShotList(annotation, narration);
+
+  // ply 0 is a book move → silent → the renderer slides with no voice.
+  const ply0 = script.shots.find((s) => s.plyIndex === 0 && s.kind === "move");
+  assert.equal(ply0.pace, "silent");
+  assert.equal(ply0.narration, null);
+  assert.ok(ply0.evalAfter, "shot should carry evalAfter for the live bar tween");
+
+  // ply 11 is a mistake (key moment) → full → keeps its spoken commentary.
+  const ply11 = script.shots.find((s) => s.plyIndex === 11 && s.kind === "moment");
+  assert.equal(ply11.pace, "full");
+  assert.ok(ply11.narration && ply11.narration.length > 0);
+  assert.ok(ply11.evalAfter);
+});
+
+test("validateNarration allows empty text on silent moves but requires it on full", () => {
+  const annotation = {
+    plies: [
+      { plyIndex: 0, isBookMove: true, classification: "book" },
+      { plyIndex: 1, isBookMove: false, classification: "mistake" },
+    ],
+    keyMoments: [],
+    challenge: null,
+  };
+  const base = {
+    schemaVersion: "1.3.0",
+    title: "Pace Test Game",
+    intro: { text: "Setting the scene.", estimatedSeconds: 5 },
+    outro: { text: "The lesson.", estimatedSeconds: 5 },
+  };
+
+  const good = {
+    ...base,
+    segments: [
+      { plyIndex: 0, text: "", estimatedSeconds: 0, pace: "silent" },
+      { plyIndex: 1, text: "This drops a pawn for nothing.", estimatedSeconds: 10, pace: "full" },
+    ],
+  };
+  const okRes = validateNarration(good, annotation);
+  assert.equal(okRes.valid, true, `expected valid, got: ${okRes.errors.join("; ")}`);
+
+  const bad = {
+    ...base,
+    segments: [
+      { plyIndex: 0, text: "", estimatedSeconds: 0, pace: "silent" },
+      { plyIndex: 1, text: "", estimatedSeconds: 0, pace: "full" },
+    ],
+  };
+  const badRes = validateNarration(bad, annotation);
+  assert.equal(badRes.valid, false);
+  assert.ok(badRes.errors.some((e) => /pace=full/.test(e)), `errors: ${badRes.errors.join("; ")}`);
+});
+
+test("validateNarration rejects an invalid pace value", () => {
+  const narration = {
+    schemaVersion: "1.3.0",
+    title: "Test game",
+    intro: { text: "hi", estimatedSeconds: 5 },
+    segments: [{ plyIndex: 0, text: "x", estimatedSeconds: 5, pace: "sprint" }],
+    outro: { text: "bye", estimatedSeconds: 5 },
+  };
+  const { valid, errors } = validateNarration(narration);
+  assert.equal(valid, false);
+  assert.ok(errors.some((e) => /pace must be one of/.test(e)));
 });

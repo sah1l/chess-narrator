@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { trackChild } from "../utils.js";
 
 const require = createRequire(import.meta.url);
 
@@ -28,9 +29,9 @@ export async function createEngine({ flavor = "lite-single", multiPV = 3 } = {})
   const pkgRoot = path.dirname(require.resolve("stockfish/package.json"));
   const binPath = path.join(pkgRoot, "bin", binName);
 
-  const child = spawn(process.execPath, [binPath], {
+  const child = trackChild(spawn(process.execPath, [binPath], {
     stdio: ["pipe", "pipe", "pipe"],
-  });
+  }));
 
   // Hold strong reference to lines for the listener model.
   const listeners = new Set();
@@ -38,7 +39,15 @@ export async function createEngine({ flavor = "lite-single", multiPV = 3 } = {})
   rl.on("line", (line) => {
     for (const fn of listeners) fn(line);
   });
-  child.stderr.on("data", () => {}); // swallow
+  // Surface engine stderr when DEBUG includes our namespace. Previously this
+  // was swallowed wholesale, so WASM load failures / crashes only showed up
+  // as a 10-minute UCI timeout downstream.
+  const debugEngine = /(^|,)chess-narrator(:engine)?(,|$)|^\*$/i.test(
+    process.env.DEBUG ?? ""
+  );
+  child.stderr.on("data", (chunk) => {
+    if (debugEngine) process.stderr.write(`[stockfish] ${chunk}`);
+  });
 
   function send(cmd) {
     child.stdin.write(cmd + "\n");

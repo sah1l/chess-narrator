@@ -1,8 +1,8 @@
 # chess-narrator
 
-Turn a chess game into a narrated MP4 explainer video. Stockfish handles the chess. Claude handles the teaching. Edge-tts and ffmpeg handle the delivery.
+Turn a chess game into a narrated MP4 explainer video — continuous gameplay where the pieces slide move-to-move and the evaluation bar rises and falls live. Stockfish handles the chess. Claude handles the teaching. Edge-tts and HyperFrames handle the delivery.
 
-Designed for intermediate club players who want to understand *why* a game went the way it did — not just see the moves played.
+Designed for intermediate club players who want to understand *why* a game went the way it did — not just see the moves played. Obvious moves slide by; the engine's mistakes, brilliancies, and turning points are where the coach stops to talk — so a typical game runs 5–7 minutes.
 
 ![Node](https://img.shields.io/badge/Node-%3E%3D22-339933) ![Stockfish](https://img.shields.io/badge/Stockfish-18-lightgrey) ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -21,16 +21,16 @@ A 1920×1080 MP4, typically 5–7 minutes, that:
 - Pauses at one critical position and asks the viewer to find the move themselves ("What would you play here?"), then explains why each plausible-looking alternative fails before revealing the answer
 - Closes with an outro that lands the lesson
 
-## Install as a Claude Code skill
+## Install as an agent skill
 
-This repo is a Claude Code skill. Install it with the GitHub CLI's skill subcommand (currently in preview), then run `npm install` + `verify` to set up the Node side.
+This repo is an agent skill compatible with GitHub Copilot, Claude Code, Cursor, OpenCode, Windsurf, and [many other AI coding agents](https://cli.github.com/manual/gh_skill_install). Install it with the GitHub CLI's skill subcommand (currently in preview), then run `npm install` + `verify` to set up the Node side.
 
 The skill lives at [`skills/chess-narrator/`](skills/chess-narrator) in this repo. `gh skill install` reads that path and drops it into your agent's skills directory.
 
 **Project-scoped (only inside the current repo, default):**
 
 ```bash
-gh skill install sah1l/chess-narrator chess-narrator --agent claude-code
+gh skill install sah1l/chess-narrator chess-narrator --agent <your-agent>
 cd .agents/skills/chess-narrator
 npm install
 node src/cli.js verify
@@ -39,7 +39,7 @@ node src/cli.js verify
 **User-scoped (available in every project on your machine):**
 
 ```bash
-gh skill install sah1l/chess-narrator chess-narrator --agent claude-code --scope user
+gh skill install sah1l/chess-narrator chess-narrator --agent <your-agent> --scope user
 # gh prints the install path — cd into it, then:
 npm install
 node src/cli.js verify
@@ -48,8 +48,10 @@ node src/cli.js verify
 **Pin to a version / commit** (avoid surprise updates):
 
 ```bash
-gh skill install sah1l/chess-narrator chess-narrator --agent claude-code --pin <tag-or-sha>
+gh skill install sah1l/chess-narrator chess-narrator --agent <your-agent> --pin <tag-or-sha>
 ```
+
+> Replace `<your-agent>` with your AI coding agent: `claude-code`, `opencode`, `github-copilot`, `cursor`, `windsurf`, etc. See the [full list of supported agents](https://cli.github.com/manual/gh_skill_install#gh-skill-install).
 
 **Update later:**
 
@@ -72,10 +74,10 @@ cd chess-narrator/skills/chess-narrator
 npm install && node src/cli.js verify
 ```
 
-To wire it up as a Claude Code skill without `gh`, copy or symlink the `skills/chess-narrator/` directory into `.agents/skills/chess-narrator/` (project scope) or your user-scoped agent skills dir.
+To wire it up as an agent skill without `gh`, copy or symlink the `skills/chess-narrator/` directory into `.agents/skills/chess-narrator/` (project scope) or your user-scoped agent skills dir.
 </details>
 
-Once installed, just say things like *"make a video of this Lichess game: https://lichess.org/abc123"* or *"explain this PGN as a walkthrough"* and Claude will run the pipeline. See [`skills/chess-narrator/SKILL.md`](skills/chess-narrator/SKILL.md) for the full trigger surface.
+Once installed, just say things like *"make a video of this Lichess game: https://lichess.org/abc123"* or *"explain this PGN as a walkthrough"* and your agent will run the pipeline. See [`skills/chess-narrator/SKILL.md`](skills/chess-narrator/SKILL.md) for the full trigger surface.
 
 ## Verify your setup
 
@@ -98,6 +100,7 @@ chess-narrator environment check
   [OK]   msedge-tts (npm)
   [OK]   ffmpeg on PATH           — ffmpeg version 6.1.1
   [OK]   Chrome/Edge/Chromium     — /Applications/Google Chrome.app/…
+  [OK]   hyperframes CLI          — cached v0.6.97 (default renderer)
   [OK]   edge-tts reachable       — speech.platform.bing.com
 
 All required dependencies present.
@@ -105,7 +108,7 @@ All required dependencies present.
 
 When you ask Claude *"verify chess-narrator"* (or *"check the chess-narrator setup"*, *"is everything installed?"*), it will run this command and walk you through any `[MISS]` items. Use `--skip-network` to skip the edge-tts reachability probe.
 
-Required: Node 22+, ffmpeg on PATH, Chrome / Chromium / Edge. The npm deps install via `npm install`. The edge-tts network check is optional — only needed if you plan to use `--engine edge` for neural-voice narration.
+Required: Node 22+, ffmpeg on PATH, Chrome / Chromium / Edge. The npm deps install via `npm install`. The HyperFrames CLI (default renderer) is fetched via `npx` on first render — it shows as `[WARN]` until then and isn't required (the ffmpeg renderer is the offline fallback). The edge-tts network check is optional — only needed if you plan to use `--engine edge` for neural-voice narration.
 
 ## Quick start
 
@@ -132,8 +135,9 @@ node src/cli.js build-script samples/output/annotation.json my-narration.json
 node src/cli.js synthesize samples/output/script.json --engine edge
 # → samples/output/script.audio.json + samples/output/audio/*.wav
 
-# 6. Render the MP4
-node src/cli.js render samples/output/script.audio.json --renderer ffmpeg --mp4 video.mp4
+# 6. Render the MP4 (default renderer = hyperframes, continuous animation;
+#    fetched via npx on first use. Add --renderer ffmpeg for the offline still fallback.)
+node src/cli.js render samples/output/script.audio.json --mp4 video.mp4
 # → video.mp4
 ```
 
@@ -154,13 +158,13 @@ node src/cli.js render samples/output/script.audio.json --renderer ffmpeg --mp4 
                               │  ── one challenge pick (or null)
                               ▼
                      ┌─────────────────┐
-                     │     Claude      │  one segment per ply, tiered
-                     │ (teacher layer) │  challenge prompt + candidates + reveal
+                     │     Claude      │  one segment per ply, paced
+                     │ (teacher layer) │  silent / brief / full + challenge
                      └────────┬────────┘
                               │  narration.json (validated)
                               ▼
                      ┌─────────────────┐
-                     │  Shot Builder   │  ply → shot mapping
+                     │  Shot Builder   │  ply → shot mapping; recomputes pace
                      │                 │  challenge expansion (5 shots)
                      └────────┬────────┘
                               │  script.json
@@ -170,9 +174,10 @@ node src/cli.js render samples/output/script.audio.json --renderer ffmpeg --mp4 
                      └────────┬────────┘
                               │  script.audio.json + audio/*.wav
                               ▼
-                     ┌─────────────────┐    Chrome headless → PNG
-                     │    Renderer     │    ffmpeg → per-shot MP4 → concat
-                     └────────┬────────┘
+                     ┌─────────────────┐  hyperframes (default): one animated
+                     │    Renderer     │  composition (sliding pieces + live
+                     │                 │  eval bar) → deterministic MP4.
+                     └────────┬────────┘  ffmpeg fallback: still slideshow.
                               │
                               ▼
                           video.mp4
@@ -184,9 +189,9 @@ Hard separation of concerns:
 
 - **Truth layer (Stockfish)** never speculates. Numbers in, numbers out. Cached on disk so re-runs are free.
 - **Teacher layer (Claude)** is constrained — must consume the structured briefing, cannot invent threats, cannot override evaluations. Coach voice over engine analysis.
-- **Delivery layer** is dumb. Takes the shot list and produces frames; no chess knowledge required.
+- **Delivery layer** is dumb. Takes the shot list and produces a video; no chess knowledge required. The default renderer builds one HyperFrames composition and renders it deterministically; an ffmpeg still-slideshow renderer remains as an offline fallback.
 
-This means you can swap any layer independently: try Leela instead of Stockfish, GPT instead of Claude, or HeyGen instead of edge-tts + ffmpeg.
+This means you can swap any layer independently: try Leela instead of Stockfish, GPT instead of Claude, or another renderer instead of HyperFrames.
 
 ## Inputs
 
@@ -232,14 +237,15 @@ Falls back to Windows SAPI 5 with `--engine system` if you have no internet (sou
 - **chess.js ^1.4.0** — PGN parsing, SAN↔UCI, FEN validation
 - **stockfish ^18.0.7** — engine (lite-single flavor, runs in-process)
 - **msedge-tts ^2** — edge-tts WebSocket client
-- **ffmpeg** on PATH — audio conversion + video stitching
-- **Chrome / Chromium** on PATH — headless board screenshots
+- **ffmpeg** on PATH — audio conversion + the ffmpeg fallback renderer
+- **Chrome / Chromium** on PATH — the ffmpeg renderer's headless board screenshots
+- **HyperFrames CLI** — the default continuous renderer; auto-fetched via `npx hyperframes` on first render (internet once, then cached; brings its own Chromium + ffmpeg)
 
 ## Tests
 
 ```bash
 npm test
-# 51 tests across annotate, classify, narrate, render, tts
+# 69 tests across annotate, classify, narrate, render, hyperframes, tts
 ```
 
 ## License

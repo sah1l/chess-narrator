@@ -130,6 +130,7 @@ function arrowSvg(arrow, sq, orientation) {
   const dx = bx - ax;
   const dy = by - ay;
   const len = Math.hypot(dx, dy);
+  if (len === 0) return ""; // degenerate arrow (same-square or zero-length)
   const shrink = sq * 0.22;
   const ux = dx / len;
   const uy = dy / len;

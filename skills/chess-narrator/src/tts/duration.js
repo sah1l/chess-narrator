@@ -34,17 +34,26 @@ export async function readWavDuration(filePath) {
       const size = ch.readUInt32LE(4);
 
       if (id === "fmt ") {
-        const fmt = Buffer.alloc(Math.min(size, 16));
-        await fh.read(fmt, 0, fmt.length, offset + 8);
-        // PCM format: bytes 8-11 of fmt chunk = ByteRate
+        // PCM fmt chunks are ≥16 bytes; bytes 8-11 carry the ByteRate.
+        // Truncated/malformed headers would otherwise overflow readUInt32LE.
+        if (size < 16) {
+          throw new Error(`Malformed fmt chunk (size=${size}, need ≥16) in ${filePath}`);
+        }
+        const fmt = Buffer.alloc(16);
+        await fh.read(fmt, 0, 16, offset + 8);
         byteRate = fmt.readUInt32LE(8);
       } else if (id === "data") {
         dataSize = size;
         break; // we don't need anything past data
       }
 
-      // Chunks are 2-byte aligned: pad odd sizes by one.
-      offset += 8 + size + (size % 2);
+      // Chunks are 2-byte aligned: pad odd sizes by one. Guard against
+      // zero-size non-data chunks that would otherwise spin forever.
+      const advance = 8 + size + (size % 2);
+      if (advance <= 8) {
+        throw new Error(`Zero-size chunk '${id}' in ${filePath}`);
+      }
+      offset += advance;
     }
 
     if (byteRate == null) throw new Error(`No fmt chunk in ${filePath}`);

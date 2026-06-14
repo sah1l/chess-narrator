@@ -13,8 +13,35 @@ import {
   renderPreviewHtml,
   writeManifest,
   getRenderer,
+  DEFAULT_RENDERER,
 } from "./render/index.js";
 import { runVerify } from "./verify.js";
+import {
+  assertPositiveInt,
+  assertSignedInt,
+  childProcesses,
+} from "./utils.js";
+
+let shuttingDown = false;
+function installSignalHandlers() {
+  const handle = (sig) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    process.stderr.write(`\nReceived ${sig}, terminating child processes…\n`);
+    for (const child of childProcesses) {
+      try { child.kill("SIGTERM"); } catch { /* already gone */ }
+    }
+    // Give children a moment to exit cleanly, then force.
+    setTimeout(() => {
+      for (const child of childProcesses) {
+        try { child.kill("SIGKILL"); } catch { /* already gone */ }
+      }
+      process.exit(130);
+    }, 1500).unref();
+  };
+  process.on("SIGINT", () => handle("SIGINT"));
+  process.on("SIGTERM", () => handle("SIGTERM"));
+}
 
 const HELP = `chess-game-explainer
 
@@ -74,10 +101,16 @@ Options (list-voices):
 
 Options (render):
   --out-dir <path>        Where to write render outputs (default: samples/output/render)
-  --renderer <name>       Compile to MP4 with renderer: 'ffmpeg' or 'hyperframes'
-                          (omit to only produce preview.html + manifest)
-  --mp4 <path>            MP4 output path when --renderer is set
-                          (default: samples/output/video.mp4)
+  --renderer <name>       MP4 renderer: 'hyperframes' (default) or 'ffmpeg'.
+                            hyperframes — continuous animated board + live eval bar
+                                          (deterministic; fetches the HyperFrames CLI
+                                          via npx on first use — needs internet once).
+                            ffmpeg      — still slideshow fallback (Chrome + ffmpeg on PATH).
+  --mp4 <path>            MP4 output path (default: samples/output/video.mp4).
+                          Passing --mp4 or --renderer triggers the MP4 compile;
+                          omit both to only produce preview.html + manifest.
+  --board-theme <name>    Board colors for the hyperframes renderer:
+                            'green' (default, chess.com), 'brown' (lichess), 'blue'.
 
 Options (verify):
   --skip-network          Skip the optional network reachability check for edge-tts
@@ -87,6 +120,7 @@ Global:
 `;
 
 async function main(argv) {
+  installSignalHandlers();
   const args = argv.slice(2);
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
     process.stdout.write(HELP);
@@ -152,11 +186,11 @@ async function cmdAnalyze(args) {
   }
 
   const input = positionals[0];
-  const sweepDepth = parseInt(values.depth ?? "10", 10);
-  const keyMomentDepth = parseInt(values["key-depth"] ?? "18", 10);
-  const positionDepth = parseInt(values["position-depth"] ?? "20", 10);
-  const multiPV = parseInt(values.multipv ?? "3", 10);
-  const openingPlies = parseInt(values["opening-plies"] ?? "10", 10);
+  const sweepDepth = assertPositiveInt("--depth", values.depth, 10);
+  const keyMomentDepth = assertPositiveInt("--key-depth", values["key-depth"], 18);
+  const positionDepth = assertPositiveInt("--position-depth", values["position-depth"], 20);
+  const multiPV = assertPositiveInt("--multipv", values.multipv, 3);
+  const openingPlies = assertPositiveInt("--opening-plies", values["opening-plies"], 10);
   const outPath = path.resolve(values.out ?? "samples/output/annotation.json");
   const cacheDir = path.resolve(values["cache-dir"] ?? "samples/output/.cache");
 
@@ -312,7 +346,7 @@ async function cmdSynthesize(args) {
 
   const script = JSON.parse(await readFile(scriptPath, "utf8"));
   const engineName = values.engine ?? "system";
-  const rate = values.rate != null ? parseInt(values.rate, 10) : undefined;
+  const rate = assertSignedInt("--rate", values.rate, undefined);
 
   log(`Synthesizing with engine=${engineName}${values.voice ? `, voice=${values.voice}` : ""} → ${audioDir}`);
   const t0 = Date.now();
@@ -343,6 +377,7 @@ async function cmdRender(args) {
       "out-dir": { type: "string" },
       renderer: { type: "string" },
       mp4: { type: "string" },
+      "board-theme": { type: "string" },
       help: { type: "boolean" },
     },
   });
@@ -367,16 +402,22 @@ async function cmdRender(args) {
   log(`  preview:  ${previewPath}`);
   log(`Open the preview in your browser to watch the explainer end-to-end.`);
 
-  if (values.renderer) {
-    log(`\nCompiling MP4 with renderer=${values.renderer}...`);
-    const renderer = getRenderer(values.renderer);
+  // Compile an MP4 when the user asks for a renderer or an output path. The
+  // default renderer is the continuous (hyperframes) one; pass
+  // --renderer ffmpeg for the still fallback.
+  if (values.renderer || values.mp4) {
+    const rendererName = values.renderer ?? DEFAULT_RENDERER;
+    log(`\nCompiling MP4 with renderer=${rendererName}...`);
+    const renderer = getRenderer(rendererName);
     const workDir = path.join(outDir, ".render-work");
     const t0 = Date.now();
     const result = await renderer.render({
+      script,
       manifest,
       manifestDir: outDir,
       outDir: workDir,
       outPath: mp4Path,
+      theme: values["board-theme"],
       onProgress: (msg) => process.stderr.write(`\r[render] ${msg}                    `),
     });
     process.stderr.write("\n");

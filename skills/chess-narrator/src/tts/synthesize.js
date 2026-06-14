@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { getEngine, DEFAULT_ENGINE } from "./index.js";
 import { readWavDuration } from "./duration.js";
+import { slugifyId } from "../utils.js";
 
 /**
  * Take a script (from buildShotList) and synthesize one audio file per shot
@@ -31,18 +32,23 @@ export async function synthesizeScript(script, opts) {
   await mkdir(outDir, { recursive: true });
   const engine = getEngine(engineName);
 
-  const shotsWithNarration = script.shots.filter((s) => s.narration);
+  // Whitespace-only narration is treated as silent — TTS engines would
+  // otherwise produce a zero-length WAV that breaks duration measurement.
+  const hasNarration = (s) => typeof s.narration === "string" && s.narration.trim().length > 0;
+  const shotsWithNarration = script.shots.filter(hasNarration);
   const newShots = [];
   let i = 0;
   for (const shot of script.shots) {
-    if (!shot.narration) {
+    if (!hasNarration(shot)) {
       newShots.push({ ...shot, audioPath: null });
       continue;
     }
-    const audioPath = path.join(outDir, `${shot.id}.wav`);
+    const audioPath = path.join(outDir, `${slugifyId(shot.id)}.wav`);
     onProgress?.({ shotId: shot.id, i: i + 1, total: shotsWithNarration.length });
     await engine.synthesize({
-      text: shot.narration,
+      // Speak normalized text (dashes → pauses) so the voice doesn't read out
+      // "dash dash"; the on-screen caption keeps the original punctuation.
+      text: normalizeForTts(shot.narration),
       outPath: audioPath,
       voice,
       rate,
@@ -73,4 +79,18 @@ export async function synthesizeScript(script, opts) {
 
 function round2(n) {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Make narration speak cleanly. TTS engines read "—" and "--" literally
+ * ("dash"), so turn every kind of dash into a comma pause. Only the spoken
+ * audio is affected — the displayed caption keeps the original text.
+ */
+export function normalizeForTts(text) {
+  return String(text ?? "")
+    .replace(/\s*[‒–—―−]\s*/g, ", ") // figure/en/em/horizontal/minus dash
+    .replace(/\s*--+\s*/g, ", ") // ASCII double hyphen
+    .replace(/\s*,\s*,+/g, ", ") // collapse doubled commas
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
